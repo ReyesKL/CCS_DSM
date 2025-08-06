@@ -1,0 +1,14 @@
+{
+  "COMPLETED_SUCCESSFULLY": false,
+  "CCS_URL": "tcp://128.138.189.140:7531/CCS.rem",
+  "PWR_TYPE": "peak",
+  "GATE_SOURCE_IDX": 2,
+  "DRAIN_SOURCE_IDX": 5,
+  "DRAIN_IDX_LCL": 0,
+  "GATE_IDX_LCL": 2,
+  "GATE_ANALYZER_IDX": 0,
+  "DRAIN_ANALYZER_IDX": 2,
+  "GATE_STEP": 1e-2,
+  "Z0": 50
+
+ }

@@ -1,0 +1,20 @@
+22-Jul-25 15:50:13 - INFO - Load Validation - CCS Install directory: C:\CCS Releases\CCS 1.5.0d20beta1
+22-Jul-25 15:50:13 - INFO - Active CCS Workspace Setups Names: 
+22-Jul-25 15:50:13 - INFO - RF Setup
+22-Jul-25 15:50:13 - INFO - Active CCS Workspace Schematics: 
+22-Jul-25 15:50:13 - INFO - DUT
+22-Jul-25 15:50:13 - INFO - RF Analyzer P1P2 (Lite) - VSTLSNALite
+22-Jul-25 15:50:13 - INFO - SwitchingMatrix P1P2 - VSTLSNALite
+22-Jul-25 15:50:13 - INFO - Source P1 - VSTLSNALite
+22-Jul-25 15:50:13 - INFO - Source Px_syncOnly_0 - VSTLSNALite
+22-Jul-25 15:50:13 - INFO - Source P2 - VSTLSNALite
+22-Jul-25 15:50:13 - INFO - Source Px_syncOnly_1 - VSTLSNALite
+22-Jul-25 15:50:13 - INFO - DC Analyzer - 6627A
+22-Jul-25 15:50:13 - INFO - DC Source 1 - 6627A
+22-Jul-25 15:50:13 - INFO - DC Source 2 - 6627A
+22-Jul-25 15:50:13 - INFO - DC Source 3 - 6627A
+22-Jul-25 15:50:13 - INFO - DC Source 4 - 6627A
+22-Jul-25 15:50:13 - INFO - DC Analyzer - 6643A
+22-Jul-25 15:50:13 - INFO - DC Source - 6643A
+22-Jul-25 15:50:13 - INFO - DC Analyzer - E3645A
+22-Jul-25 15:50:13 - INFO - DC Source 1 - E3645A

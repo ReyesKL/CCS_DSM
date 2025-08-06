@@ -1,0 +1,25 @@
+{
+  "FILE_PATH": "C:\\Users\\rfUser\\Desktop\\walp_test",
+  "DATA_FILE_NAME": "thru_validation.h5",
+  "MEAS_ATTRS": {
+    "Description": "testing the new WALPorithm",
+    "User": "Reyes Lucero",
+    "StartDate": "",
+    "EndDate": "",
+    "DUT": "Cree CG2H4006P",
+    "DriverPort1": "MiniCircuits ZVE-83+",
+    "DriverPort2": "Morton 2-stage PA Driver",
+    "BiasTees": "ZX85-40W-63-S+",
+    "NumPorts": 2,
+    "VSTPN": "5840",
+    "CouplerPN": "Fairview Microwave PN: MC2047-20",
+    "TunerPN": "L-WALP",
+    "CompletedSuccessfully": "",
+    "DUTDrainCurrentLimit": "",
+    "DUTDesiredQuiescent": "",
+    "CalibrationType": "TRL",
+    "CombGenerator": "VST",
+    "PowerMeterPN": "NI USB-5681",
+    "Z0": "50"
+    }
+  }

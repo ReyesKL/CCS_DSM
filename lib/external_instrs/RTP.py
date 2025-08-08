@@ -3,7 +3,8 @@ import time
 import numpy as np
 import scipy.io as sio
 from pathlib import Path, WindowsPath
-
+from rich.progress import Progress
+from lib.external_instrs import ScopeViewer
 
 class RTP:
 
@@ -18,15 +19,18 @@ class RTP:
         v_scale_max = 10
         # num_steps = int(v_scale_max / v_scale_min)
         self.ranges = np.arange(v_scale_min,v_scale_max+v_scale_min,v_scale_min)
+        self.scope_view = ScopeViewer.ScopeViewer()
 
-    def get_td_data(self,channel):
-        self.log.info(f"{self.name}: Mesasuring time domain waveform")
+    def get_td_data(self,channel, rerun=True, update_view=True):
+        self.log.info(f"{self.name}chn:{channel}: Measuring time domain waveform")
         channel = int(channel)
-        self.rtp.write("CHAN{channel}:MEAS:FORM BIN")
 
-        self.rtp.write("RUNS")
-
+        if rerun:
+            self.rtp.write("RUNS")
+        self.rtp.write(f"FORM:DATA REAL,32")
         dat = self.rtp.query_binary_values(f"CHAN{channel}:WAV1:DATA?")
+        # dat = self.rtp.query_ascii_values(f"CHAN{channel}:WAV1:DATA?")
+
         # dat = dat.split(',')
         # dat = list(float(x) for x in dat)
         header = self.rtp.query(f"CHAN{channel}:WAV1:DATA:HEAD?").strip()
@@ -35,6 +39,9 @@ class RTP:
         t1 = float(header[1])
         ns = int(header[2])
         t = np.linspace(0, t1-t0, ns)
+        if update_view:
+            self.scope_view.set_time_base(t)
+            self.scope_view.update_trace(channel, dat)
 
         return t, dat
 
@@ -42,19 +49,23 @@ class RTP:
         self.set_chn_scale(chn,1)
         old_scale = np.nan
         new_scale = 0.5
-        while not np.isclose(old_scale,new_scale, rtol=1e-1,atol=1e-3):
-            t , v = self.get_td_data(chn)
-            v_mn = np.mean(v)
-            v_pk = np.max(v)
-            v_min = np.min(v)
-            v_rang = v_pk - v_min
-            v_rang = np.nanmax([v_rang, old_scale/5]) # don't take steps that are too big
+        with Progress() as progress:
+            task = progress.add_task(f"Auto-scaling channel {chn}", total=None)
+            while not np.isclose(old_scale,new_scale, rtol=1e-1,atol=1e-3):
+                t , v = self.get_td_data(chn)
+                # v_mn = np.mean(v)
+                v_pk = np.max(v)
+                v_min = np.min(v)
+                v_rang = v_pk - v_min
+                # v_rang = np.nanmax([v_rang, old_scale])
 
-            old_scale = new_scale
-            new_scale = 5 * (v_rang/10)
-            self.set_offset(v_mn, chn)
-            self.set_chn_scale(chn,new_scale)
-            time.sleep(0.1)
+                old_scale = new_scale
+                # new_scale = 5 * (v_rang/10)
+                new_scale = v_rang / 2
+                # self.set_offset(v_mn, chn)
+                self.set_chn_scale(chn,new_scale)
+                time.sleep(0.1)
+            progress.remove_task(task)
         # return (t, d)
     def set_chn_scale(self,chn, scale):
         self.rtp.write(f"CHAN{chn}:SCAL {scale}")
@@ -65,6 +76,9 @@ class RTP:
     def set_acq_time(self, acq_time):
         self.rtp.write(f"TIM:RANG {acq_time}")
 
+    def set_sample_rate(self, sample_rate):
+        self.log.info(f"{self.name}: Setting sample rate to {sample_rate/1e9} GHz")
+        self.rtp.write(f"ACQ:SRAT {sample_rate}")
 
 
     def close(self):

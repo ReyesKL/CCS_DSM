@@ -47,18 +47,17 @@ rm = pyvisa.ResourceManager()
 
 scope = RTP(rm, "TCPIP0::128.138.189.100::inst0::INSTR", log, "scope")
 
-f0 = 2.25e9
-signal_bw = 1e6
-oversample_rate = 2
+f0 = 4.5e9
+signal_bw = 5e6
+oversample_rate = 4
 
 signal_period = 1/signal_bw
-num_periods = 10
+num_periods = 2
 
 scope.set_acq_time(num_periods*signal_period)
 scope.set_sample_rate(oversample_rate*(f0))
-scope.get_td_data(channel=1, rerun=False, update_view=False)
 # scope.auto_scale(chn=1)
 # scope.get_td_data(1)
 
 aligner = DsmAligner(scope=scope, log =log, rf_source=vst.source1, signal_period=signal_period, pa_chn=1, dsm_chn=2)
-aligner.align(debug=True, atol=1e-10, n_its=10)
+aligner.align(debug=True, atol=1e-10, n_its=20)

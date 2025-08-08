@@ -10,11 +10,11 @@ class DsmAligner:
         self.pa_chn = pa_chn
         self.dsm_chn = dsm_chn
         self.signal_period = signal_period
-        #############################
-        #for testing only
-        self.rf_source.Delay = 0.314159e-6
-        #for testing only
-        #############################
+        # #############################
+        # #for testing only
+        # self.rf_source.Delay = 0.19575e-6
+        # #for testing only
+        # #############################
 
 
 
@@ -30,19 +30,16 @@ class DsmAligner:
             _, dsm_wvfm = self.scope.get_td_data(self.dsm_chn, rerun=False)
             # get envelope of rf waveform
             pa_env_wvfm = np.abs(scipy.signal.hilbert(pa_wvfm))
+            # pa_env_wvfm = pa_env_wvfm / np.max(pa_env_wvfm)
 
-            #############################
-            # for testing only
-            dsm_wvfm = np.abs(scipy.signal.hilbert(dsm_wvfm))
-            # for testing only
-            #############################
+            # #############################
+            # # for testing only
+            # dsm_wvfm = np.abs(scipy.signal.hilbert(dsm_wvfm))
+            # # dsm_wvfm = dsm_wvfm / np.max(dsm_wvfm)
+            # # for testing only
+            # #############################
 
-            # if debug:
-            #     plt.plot(t, pa_env_wvfm, label="RF envelope")
-            #     plt.plot(t, dsm_wvfm, label="DSM envelope")
-            #     plt.legend(loc="upper right")
-            #     plt.grid()
-            #     plt.show()
+
 
             # cross correlate the wave forms and find the delay
             corr = scipy.signal.correlate(pa_env_wvfm, dsm_wvfm)
@@ -64,6 +61,15 @@ class DsmAligner:
             i += 1
         if aligned:
             self.log.info(f"DSM waveforms aligned in {i} its")
+            self.log.info(f"DSM delay is {self.rf_source.Delay*1e9:.2f} ns")
+            if debug:
+                plt.ioff()
+                fig, ax = plt.subplots()
+                ax.plot(t, pa_env_wvfm, label="RF envelope")
+                ax.plot(t, dsm_wvfm, label="DSM envelope")
+                ax.legend(loc="upper right")
+                ax.grid()
+                plt.show()
         else:
             self.log.error(f"DSM waveforms did not align in {i} its")
 

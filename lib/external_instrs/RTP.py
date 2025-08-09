@@ -5,6 +5,7 @@ import scipy.io as sio
 from pathlib import Path, WindowsPath
 from rich.progress import Progress
 from lib.external_instrs import ScopeViewer
+import skrf as rf
 
 class RTP:
 
@@ -22,6 +23,8 @@ class RTP:
         self.scope_view = ScopeViewer.ScopeViewer()
         self._update_viewer_time()
         self.fixtures = [None, None, None, None]
+        self.fixture_config = [True, True, True, True]
+        self.Z0 = 50 #must be reference impedance of fixture s-parameters
 
     def get_td_data(self,channel, rerun=True, update_view=True):
         self.log.info(f"{self.name}chn:{channel}: Measuring time domain waveform")
@@ -46,6 +49,44 @@ class RTP:
             self.scope_view.update_trace(channel, dat)
 
         return t, dat
+    
+    def de_embedd_td_data(self, channel, t, dat):
+        
+
+        if self.fixtures[channel]:
+            #get the network parameters of the corresponding fixture
+            net = self.fixtures[channel]
+
+            #get the time step
+            dt = t[1]-t[0]
+
+            #Step 1: convert data to frequency domain
+            V = np.fft.fft(dat)
+            f = np.fft.fftfreq(dat.size, dt)
+
+            #Step 2: truncate the data to the network frequencies 
+            network_frequencies = net.f
+            min_freq = np.min(network_frequencies); max_freq = np.max(network_frequencies)
+            keep = np.logical_an(f >= min_freq, f <= max_freq)
+            #truncate the data to the values inside of the desired frequency range 
+            Vx = V[keep]; fx = f[keep]
+            
+            #Step 3: now perform the de-embedding 
+            net = net.interpolate(fx)
+            if self.fixture_config[channel]: #port 1 is on the DUT
+                Vx = Vx * (1 + self.Z0 * net.s11) / (self.Z0 * self.s21)
+            else: 
+                Vx = Vx * (1 + self.Z0 * net.s22) / (self.Z0 * self.s12)
+
+            #reset the voltage array
+            V = np.zeros_like(V, dtype="complex")
+            V[keep] = Vx[:]
+
+            #Step 4: finally take the ifft 
+            dat = np.fft.ifft(V)
+
+        #return time domain data
+        return dat
 
     def auto_scale(self,chn):
         self.set_chn_scale(chn,1)

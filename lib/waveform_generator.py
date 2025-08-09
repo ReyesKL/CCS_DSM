@@ -2,6 +2,7 @@
 Title: Waveform Generator
 Author: Paul Flaten
 Date: 8/9/2025
+Description: TODO
 """
 
 

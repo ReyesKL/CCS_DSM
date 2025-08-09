@@ -23,8 +23,7 @@ class RTP:
         self.scope_view = ScopeViewer.ScopeViewer()
         self._update_viewer_time()
         self.fixtures = [None, None, None, None]
-        self.fixture_config = [True, True, True, True]
-        self.Z0 = 50 #must be reference impedance of fixture s-parameters
+        self.port_on_dut = [1, 1, 1, 1]
 
     def get_td_data(self,channel, rerun=True, update_view=True):
         self.log.info(f"{self.name}chn:{channel}: Measuring time domain waveform")
@@ -67,23 +66,26 @@ class RTP:
             #Step 2: truncate the data to the network frequencies 
             network_frequencies = net.f
             min_freq = np.min(network_frequencies); max_freq = np.max(network_frequencies)
-            keep = np.logical_an(f >= min_freq, f <= max_freq)
+            keep = np.logical_and(f >= min_freq, f <= max_freq)
+
             #truncate the data to the values inside of the desired frequency range 
             Vx = V[keep]; fx = f[keep]
             
             #Step 3: now perform the de-embedding 
             net = net.interpolate(fx)
-            if self.fixture_config[channel]: #port 1 is on the DUT
-                Vx = Vx * (1 + self.Z0 * net.s11) / (self.Z0 * self.s21)
-            else: 
-                Vx = Vx * (1 + self.Z0 * net.s22) / (self.Z0 * self.s12)
+            if self.port_on_dut[channel]==1: #port 1 is on the DUT
+                Vx = Vx * (1 + net.z0 * net.s11) / (net.z0 * net.s21)
+            elif self.port_on_dut[channel]==2: 
+                Vx = Vx * (1 + net.z0 * net.s22) / (net.z0 * net.s12)
+            else:
+                raise ValueError("Fixture port index on dut must be 1 or 2")
 
             #reset the voltage array
             V = np.zeros_like(V, dtype="complex")
             V[keep] = Vx[:]
 
-            #Step 4: finally take the ifft 
-            dat = np.fft.ifft(V)
+            #Step 4: finally take the ifft (real voltages should only result in real voltages)
+            dat = np.real(np.fft.ifft(V))
 
         #return time domain data
         return dat

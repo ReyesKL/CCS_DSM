@@ -584,10 +584,17 @@ class Grid(_Grid):
     
     def __del__(self):
         #Grid deconstructor 
+
+        #remove the reference of this grid from the parent
+        if self.has_parent:
+            self.parent.rem_child(self)
+
         #delete each child from memory
         for idx in range(0, self.num_children):
             #get the present child
-            del self.__children[0]
+            self.__children[idx].forget_parent()
+            #delete the current child
+            # del self.__children[0] #seems a little extreme
     
     def __eq__(self,other:_Grid):
         #Checks if two grids are equivalent with one another
@@ -659,10 +666,44 @@ class Grid(_Grid):
             child = child_ref
         else:
             raise TypeError("child_reference must be a name, index, or Grid")
-
+        
         #now call deconstructor on the child
         del child
-    
+
+    def forget_child(self, child_ref):
+        #remove the child 
+        if isinstance(child_ref, str):
+            #get the child by name
+            child = self.get_child_by_name(child_ref)
+            #handle the case where nothing has been found
+            if child is None:
+                raise NameError(f"Could not find child with name {child_ref}")
+        elif isinstance(child_ref, int):
+            #get the child by index
+            child = self.get_child_by_index(child_ref)
+            #handle the case where None is returned
+            if child is None:
+                raise IndexError(f"Subgrid could not be found at location {child_ref}")
+        elif isinstance(child_ref, Grid):
+            #otherwise it is a direct reference to the child
+            child = child_ref
+        else:
+            raise TypeError("child_reference must be a name, index, or Grid")
+        
+        #now remove the child from the list of children 
+        children_to_forget = [idx for idx, present_child in enumerate(self.__children) if present_child is child]
+
+        #now remove all matches (should only be one but we will use a list to be certain)
+        for child_idx in children_to_forget:
+            #forget the parent
+            self.__children[child_idx].forget_parent()
+            #forget the child
+            self.__children.remove(child_idx)
+
+    def forget_parent(self):
+        # forget the current parent 
+        self.__parent = None
+
     def get_child_by_name(self, name):
         #initialize the reference to none
         ref = None
@@ -713,6 +754,25 @@ class Grid(_Grid):
     @is_compatible.register(np.ndarray)
     def _(self,x:np.ndarray):
         return self.size == x.size
+
+
+    def shift(self,amount:int):
+        #Shift - Shifts the current grid mask by the amount specified. This amount can be by tones (if specified as an integer) or by frequency (if specified as a floating point number). Note that the signal will not wrap, even though the grid may wrap around. 
+        if not self.has_parent:
+            raise RuntimeError("Cannot shift a grid if it is standalone or a root grid.")
+        elif not isinstance(amount, (int,float)):
+            raise TypeError("Valid arguments for shift are integer or floating point number")
+
+        #handle the case where we want to shift by frequency (floating point number input)
+        if isinstance(amount, float):
+            #we will use the frequency resolution of the parent grid (this may cause undesired behavior if the parent is not uniform)
+            parent_resolution = self.parent.frequency_resolution
+
+            #get the amount to wrap around in number of tones (round to the nearest integer) 
+            amount = int(np.round(amount / float(parent_resolution)))
+
+        #now roll the mask by the specified amount
+        self.mask = np.roll(self.mask, amount)
 
     def find_address(self, target:_Grid, 
                      search_subgrids:bool=True, 
@@ -959,6 +1019,25 @@ class Grid(_Grid):
     def parent(self):
         return self.__parent
     
+    @parent.setter
+    def parent(self, new_parent):
+        if self.has_parent:
+            raise RuntimeError("Grid already has a parent. Please call forget parent first.")
+        
+
+    def adopt_parent(self, new_parent):
+
+        #Make sure that the new entry makes sense
+        if self.has_parent:
+            raise RuntimeError("Grid already has a parent. Please call forget parent first.")
+        elif not isinstance(new_parent,Grid):
+            raise TypeError("New parent grid must be a Grid object.")
+        elif not self.mask.size == new_parent.size:
+            raise ValueError(f"Present mask size {self.mask.size} must match that of the parent grid size {new_parent.size}")
+
+        #if everythin passed, then we can set the new parent
+        self.__parent  = new_parent
+
     @property
     def freqs(self):
         """
@@ -1024,6 +1103,26 @@ class Grid(_Grid):
     def mask(self):
         return self.__mask
     
+    @property
+    def frequency_resolution(self):
+        #Returns the frequency resolution of the current grid 
+        f = self.freqs
+        #get an array of frequency steps in the grid
+        f_step = f[1:-1] - f[0:-2]
+        #the frequency resolution will be the minimum of all f_steps
+        return np.min(f_step)
+
+    @property 
+    def bandwidth(self):
+        #Returns the bandwidth of the current grid
+        return self.freqs[-1] - self.freqs[0]
+    
+    @property 
+    def period(self):
+        #Returns the expected period of any signal on the grid
+
+        #The period of the grid is the same as 1 over the minimum step in frequency
+        return 1 / self.frequency_resolution
     """
     Other Code Not Implemented Yet
     """

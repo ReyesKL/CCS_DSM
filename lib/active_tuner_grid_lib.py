@@ -956,7 +956,7 @@ class Grid(_Grid):
         #Generate index for the present grid
         #TODO: make this about the reference frequency rather than the frequency
 
-        #generate the intial indices
+        #generate the initial indices
         idxs = np.arange(self.size)
 
         #generate indexing about the center of the grid rather than the left side

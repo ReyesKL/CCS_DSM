@@ -50,8 +50,6 @@ class RTP:
         return t, dat
     
     def de_embedd_td_data(self, channel, t, dat):
-        
-
         if self.fixtures[channel]:
             #get the network parameters of the corresponding fixture
             net = self.fixtures[channel]

@@ -406,7 +406,6 @@ def calc_td_powers(a1, b1, a2, b2, freqs, z0=50.0):
     #return the input power and gain 
     return pin, pout, t
 
-
 class acpr_manager:
 
     def __init__(self, reference_signal, measurement_grid, 
@@ -470,7 +469,7 @@ class acpr_manager:
 
         #normalize the reference power right out of the gate to avoid redundant calcs
         p_ref_norm = (p_ref / ref_size)
-        
+
         #calculate the normalized lower acpr 
         acpr_lower = (p_lower / lower_size) / p_ref_norm
         acpr_upper = (p_upper / upper_size) / p_ref_norm

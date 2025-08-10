@@ -176,7 +176,8 @@ class Multitone_Waveform_Generator:
         self.ref_grid = Grid.generate(f"{self.name}_reference_grid", new_generator, self.root_grid)
 
         #now shift the grid by the requested center frequency 
-        self.ref_grid.shift(float(self.center_frequency - self.ref_grid.ref_freq))
+        # self.ref_grid.shift(float(self.center_frequency - self.ref_grid.ref_freq))
+        self.ref_grid.shift_center_to(self.center_frequency)
 
     def build_signal_grid(self):
         

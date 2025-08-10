@@ -755,23 +755,42 @@ class Grid(_Grid):
     def _(self,x:np.ndarray):
         return self.size == x.size
 
+    def shift_center_to(self, target:float):
+        #Shift's center frequency to that specified by the target (in Hz)
+        #get the amount of frequency to shift by (positive indicates shift to right)
+        
+        #throw an error if this grid cannot be shifted
+        if not self.has_parent:
+            raise RuntimeError("Cannot shift a grid if it is standalone or a root grid")
+        
+        #get the raw amount to shift by 
+        amount = target - self.center_frequency
+
+        #TODO: the next section should autosnap to the parent grid; however, it would be nice if this was automatically reported
+
+        #attempt to shift the grid 
+        self.shift(amount)
+
 
     def shift(self,amount:int):
-        #Shift - Shifts the current grid mask by the amount specified. This amount can be by tones (if specified as an integer) or by frequency (if specified as a floating point number). Note that the signal will not wrap, even though the grid may wrap around. 
+        #Shift - Shifts the current grid mask by the amount specified in units of Hz. 
         if not self.has_parent:
             raise RuntimeError("Cannot shift a grid if it is standalone or a root grid.")
         elif not isinstance(amount, (int,float)):
             raise TypeError("Valid arguments for shift are integer or floating point number")
 
-        #handle the case where we want to shift by frequency (floating point number input)
-        if isinstance(amount, float):
-            #we will use the frequency resolution of the parent grid (this may cause undesired behavior if the parent is not uniform)
-            parent_resolution = self.parent.frequency_resolution
+        #we will use the frequency resolution of the parent grid (this may cause undesired behavior if the parent is not uniform)
+        parent_resolution = self.parent.frequency_resolution
 
-            #get the amount to wrap around in number of tones (round to the nearest integer) 
-            amount = int(np.round(amount / float(parent_resolution)))
+        #get the amount to wrap around in number of tones (round to the nearest integer) 
+        amount = int(np.round(float(amount) / float(parent_resolution)))
 
         #now roll the mask by the specified amount
+        self.roll(amount)
+        # self.__mask = np.roll(self.mask, amount)
+
+    def roll(self, amount:int):
+        #Roll the current grid by some quantity
         self.__mask = np.roll(self.mask, amount)
 
     def find_address(self, target:_Grid, 
@@ -1123,6 +1142,17 @@ class Grid(_Grid):
 
         #The period of the grid is the same as 1 over the minimum step in frequency
         return 1 / self.frequency_resolution
+    
+    @property 
+    def center_frequency(self):
+        #Returns the frequency (on the root grid) that is halfway between the extenses of this grid's frequency
+        grid_freqs = self.freqs
+        root_freqs = self.root.freqs
+        #get the mean frequency
+        mean_freq = (grid_freqs[0] + grid_freqs[-1])/2
+        #return the closest on-grid frequency that matches
+        return root_freqs[np.argmin(np.abs(mean_freq-root_freqs))]
+
     """
     Other Code Not Implemented Yet
     """

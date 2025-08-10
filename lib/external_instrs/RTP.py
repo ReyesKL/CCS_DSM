@@ -57,6 +57,10 @@ class RTP:
             #get the network parameters of the corresponding fixture
             net = self.fixtures[channel]
 
+            #throw an error if the provided network is not of the right type as we need the interpolate method of the network
+            if not isinstance(net, rf.network.Network):
+                raise TypeError("Fixture data must be provided as an skrf network.")
+
             #get the time step
             dt = t[1]-t[0]
 

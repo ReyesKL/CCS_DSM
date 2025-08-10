@@ -772,7 +772,7 @@ class Grid(_Grid):
             amount = int(np.round(amount / float(parent_resolution)))
 
         #now roll the mask by the specified amount
-        self.mask = np.roll(self.mask, amount)
+        self.__mask = np.roll(self.mask, amount)
 
     def find_address(self, target:_Grid, 
                      search_subgrids:bool=True, 

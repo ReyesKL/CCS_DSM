@@ -8,8 +8,8 @@ Description: TODO
 
 #Perform imports for signal creation 
 import numpy as np
-from multitone_signal_lib import MultitoneSignal
-from active_tuner_grid_lib import Grid, GridGenerator, OrMask
+from lib.multitone_signal_lib import MultitoneSignal
+from lib.active_tuner_grid_lib import Grid, GridGenerator, OrMask
 from typing import Union, Literal
 
 
@@ -161,7 +161,7 @@ class Multitone_Waveform_Generator:
         f_high_match = root_idx[np.argmin(np.abs(f_high - root_freqs))]
 
         #the reference grid indices will be the root grid indices multiplied by the signal period factor
-        ref_idx = int(signal_period_factor * root_idx)
+        ref_idx = (signal_period_factor * root_idx).astype("int")
 
         #make sure the reference indices fall within the specified bandwidth on the root grid
         ref_idx = ref_idx[np.logical_and(ref_idx >= f_low_match, ref_idx <= f_high_match)]

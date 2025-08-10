@@ -14,6 +14,10 @@ sys.coinit_flags = 2
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
+#VST libraries that this module depends on 
+from active_tuner_grid_lib import Grid
+from multitone_signal_lib import MultitoneSignal
+
 #For demo purposes only
 #get the current directory 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -401,3 +405,90 @@ def calc_td_powers(a1, b1, a2, b2, freqs, z0=50.0):
     
     #return the input power and gain 
     return pin, pout, t
+
+
+class acpr_manager:
+
+    def __init__(self, reference_signal, measurement_grid, 
+                 gaurd_bandwidth:float = 10e6, 
+                 adjacent_channel_bandwidth:Union[float, None]=None):
+        
+        #Set the hidden properties for this object
+        self.__ref_sig = None
+        self.__ref_channel_mask   = None
+        self.__lower_channel_mask = None
+        self.__upper_channel_mask = None
+
+        #Set the measurement grid
+        if isinstance(measurement_grid, Grid):
+            self.__root_grid = measurement_grid
+        else:
+            raise TypeError("Measurement grid must be of type Grid")
+       
+        #set the gaurd bandwidths 
+        self.gaurd_bandwidth = gaurd_bandwidth
+        self.adjacent_channel_bandwidth = adjacent_channel_bandwidth
+
+        #now set the reference signal
+        self.reference_signal = reference_signal
+
+    def __build_channel_masks(self):
+
+        #get the signal frequencies 
+        sig_freqs = self.reference_signal.grid.freqs
+        f_sig_low = sig_freqs[0]; f_sig_high = sig_freqs[-1]
+
+        #now identify the inner frequencies from the gaurd band requirements 
+        f1b = f_sig_low - self.gaurd_bandwidth; f2a = f_sig_high + self.gaurd_bandwidth
+
+        #identify the bandwidth of the adjacent channels
+        if self.adjacent_channel_bandwidth is None: 
+            channel_bandwidth = f_sig_high - f_sig_low
+        else:
+            channel_bandwidth = self.adjacent_channel_bandwidth
+
+        #now identify the outter frequencies from the channel bandwidth requirements
+        f1a = f1b - channel_bandwidth; f2b = f2a + channel_bandwidth
+
+        #finally, find the points on the measurement grid between the desired frequencies listed here
+        meas_freqs = self.__root_grid.freqs 
+
+        #set the channel points 
+        # ref_grid = self.__ref_sig.grid
+        # self.__ref_channel_mask   = ref_grid.cast(ref_grid.full_like(True, dtype="bool"), self.__root_grid, off_grid_vals=False, dtype="bool")
+        self.__ref_channel_mask   = np.logical_and(f_sig_low <= meas_freqs, meas_freqs <= f_sig_high)
+        self.__lower_channel_mask = np.logical_and(f1a <= meas_freqs, meas_freqs < f1b)
+        self.__upper_channel_mask = np.logical_and(f2a <  meas_freqs, meas_freqs < f2b)
+
+    def calc_acpr(self, meas_power:np.ndarray[float]):
+        #Calculate the ACPR from measured spectral power and returns in dB
+
+        #get the data from each of the three channels
+        p_lower = np.sum(meas_power[self.__lower_channel_mask]);    lower_size = self.__lower_channel_mask.size
+        p_upper = np.sum(meas_power[self.__upper_channel_mask]);    upper_size = self.__upper_channel_mask.size
+        p_ref   = np.sum(meas_power[self.__ref_channel_mask]);      ref_size = self.__ref_channel_mask.size
+
+        #normalize the reference power right out of the gate to avoid redundant calcs
+        p_ref_norm = (p_ref / ref_size)
+        
+        #calculate the normalized lower acpr 
+        acpr_lower = (p_lower / lower_size) / p_ref_norm
+        acpr_upper = (p_upper / upper_size) / p_ref_norm
+        acpr_full  = ((p_lower + p_upper) / (lower_size + upper_size)) / p_ref_norm
+
+        #return the results of the calculation 
+        return db(acpr_lower), db(acpr_upper), db(acpr_full)
+
+    @property 
+    def reference_signal(self)->MultitoneSignal:
+        return self.__ref_sig
+    
+    @reference_signal.setter
+    def reference_signal(self, new_val:MultitoneSignal):
+        #setter for the reference signal
+        if not isinstance(new_val, MultitoneSignal):
+            raise TypeError("New reference signal must be a multitone signal object")
+        #set the signal
+        self.__ref_sig = new_val
+        #rebuild all channel masks
+        self.__build_channel_masks()

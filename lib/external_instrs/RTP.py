@@ -49,8 +49,11 @@ class RTP:
 
         return t, dat
     
-    def de_embedd_td_data(self, channel, t, dat):
-        if self.fixtures[channel]:
+    def de_embed_td_data(self, channel, t, dat):
+        """
+        De-Embedd the time domain voltage. This assumes that the oscilloscope is perfectly matched to Z0. Also, the data is automatically truncated to the fixtured data S-parameters (all values outside of this are assumed to be zero). If there isn't a fixture on the channel, this method will simply return the input data.
+        """
+        if self.fixtures[channel] is not None:
             #get the network parameters of the corresponding fixture
             net = self.fixtures[channel]
 
@@ -58,16 +61,20 @@ class RTP:
             dt = t[1]-t[0]
 
             #Step 1: convert data to frequency domain
-            V = np.fft.fft(dat)
+            V = np.fft.fft(dat) / dat.size
             f = np.fft.fftfreq(dat.size, dt)
+
+            #get this single sideband data 
+            V_SS = 2*V[f>=0]
+            f_SS = f[f>=0]
 
             #Step 2: truncate the data to the network frequencies 
             network_frequencies = net.f
             min_freq = np.min(network_frequencies); max_freq = np.max(network_frequencies)
-            keep = np.logical_and(f >= min_freq, f <= max_freq)
+            keep = np.logical_and(f_SS >= min_freq, f_SS <= max_freq)
 
             #truncate the data to the values inside of the desired frequency range 
-            Vx = V[keep]; fx = f[keep]
+            Vx = V_SS[keep]; fx = f_SS[keep]
             
             #Step 3: now perform the de-embedding 
             net = net.interpolate(fx)
@@ -79,10 +86,18 @@ class RTP:
                 raise ValueError("Fixture port index on dut must be 1 or 2")
 
             #reset the voltage array
-            V = np.zeros_like(V, dtype="complex")
-            V[keep] = Vx[:]
+            V_SS = np.zeros_like(V_SS, dtype="complex")
+            V_SS[keep] = Vx[:]
 
-            #Step 4: finally take the ifft (real voltages should only result in real voltages)
+            #Step 4: find the corresponding de-embedded time-domain waveform
+            
+            #re-compute the double side-band version of the voltage
+            V = np.append(V_SS, np.conj(np.flip(V_SS[1:],axis=0))) 
+
+            #re-normalize the voltage for the ifft
+            V = V * (V.size / 2)
+
+            #perform the ifft (input voltage is only real valued so we remove the imaginary part)
             dat = np.real(np.fft.ifft(V))
 
         #return time domain data

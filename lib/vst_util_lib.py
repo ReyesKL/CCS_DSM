@@ -15,8 +15,8 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 
 #VST libraries that this module depends on 
-from active_tuner_grid_lib import Grid
-from multitone_signal_lib import MultitoneSignal
+from lib.active_tuner_grid_lib import Grid
+from lib.multitone_signal_lib import MultitoneSignal
 
 #For demo purposes only
 #get the current directory 

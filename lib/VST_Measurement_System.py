@@ -157,6 +157,11 @@ class MeasurementSystem:
         self.__source_net           = None
         self.__load_net             = None
 
+        #Initialize the measurement grid during class initialization
+
+        #first, build the measurement grid as the base grid for the tuners
+        self.measurement_grid = self.__generate_base_grid()
+
     def init_aligner(self):
         rel_ph = np.array(list(map(float, self.source1.RelativeMultiTones.RelativePhases)))
         rel_amp = np.array(list(map(float, self.source1.RelativeMultiTones.RelativeAmplitudes)))
@@ -1528,7 +1533,7 @@ class MeasurementSystem:
         ## Build the grids for the tuners to use
 
         #first, build the measurement grid as the base grid for the tuners
-        self.measurement_grid = self.__generate_base_grid()
+        # self.measurement_grid = self.__generate_base_grid()
 
         self.excitation_grids = []
         self.__source_grids = []

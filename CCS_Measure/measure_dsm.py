@@ -104,9 +104,10 @@ rel_amp = np.array(list(map(float, source.RelativeMultiTones.RelativeAmplitudes)
 source1_power = source.OutputLevel
 
 #now transfer this signal to the second source
+sig_indices = VstSys.measurement_grid.cast_index(sig.grid, about_center=True)
 source = VstSys.source2
 source.OutputLevel = source1_power
-source.PlayMultitone((list(sig.grid.index(about_center=True))), rel_amp, rel_ph)
+source.PlayMultitone((list(sig_indices)), rel_amp, rel_ph)
 
 rm = pyvisa.ResourceManager()
 scope = RTP(rm, "TCPIP0::128.138.189.100::inst0::INSTR", log, "scope")

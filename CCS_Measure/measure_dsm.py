@@ -74,6 +74,7 @@ source_tuner = VstSys.tuners[0]
 load_tuner   = VstSys.tuners[1]
 
 #assume that the source tuner is matched
+VstSys.find_reflection_coefficients(source_1_power=-20, source_2_power=-20, return_power_lvl=-20, use_grid="tuner")
 source_tuner.gamma_0 = source_tuner.grid.full_like(0, dtype="complex")
 load_tuner.gamma_0   = load_tuner.grid.full_like(0, dtype="complex")
 

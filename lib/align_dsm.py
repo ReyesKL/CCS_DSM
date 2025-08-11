@@ -27,6 +27,7 @@ class DsmAligner:
             self.scope.auto_scale(self.pa_chn)
             self.scope.auto_scale(self.dsm_chn)
             t, pa_wvfm = self.scope.get_td_data(self.pa_chn)
+            pa_wvfm = self.scope.de_embed_td_data(self.pa_chn, t, pa_wvfm)
             _, dsm_wvfm = self.scope.get_td_data(self.dsm_chn, rerun=False)
             # get envelope of rf waveform
             pa_env_wvfm = np.abs(scipy.signal.hilbert(pa_wvfm))

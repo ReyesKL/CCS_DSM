@@ -7,7 +7,9 @@ from lib.align_dsm import DsmAligner
 from lib.SweepVar import SweepVar, Sweep, sweep_to_xarray_from_func
 import pyvisa
 import numpy as np
-
+import skrf as rf
+from lib.waveform_generator import Multitone_Waveform_Generator as AWG
+from lib.vst_util_lib import acpr_manager
 """
 Initialize the VST 
 """
@@ -57,8 +59,15 @@ VstSys = MeasurementSystem(ccsURL, GATE_SOURCE_IDX, DRAIN_SOURCE_IDX, GATE_IDX_L
                             DRAIN_OSC_THRESHOLD, DRAIN_MAX_CURRENT, GATE_MIN_MAX_V, DRAIN_MIN_MAX_V, GATE_PINCH_OFF,
                             GATE_BIAS_INIT, DRAIN_BIAS_INIT, log)
 
+#load signal onto source 1
+awg = AWG("one_word", VstSys.measurement_grid, center_frequency=4.25e9, signal_bandwidth=10e6)
+sig = awg.get_signal_with_par(8)
+VstSys.load_signal(sig, 1)
+acpr_calculator = acpr_manager(sig, VstSys.measurement_grid, guard_bandwidth=100e3)
+
 rm = pyvisa.ResourceManager()
 scope = RTP(rm, "TCPIP0::128.138.189.100::inst0::INSTR", log, "scope")
+scope.fixture[0] = rf.Network(r"fixtures/output_fixture_dsm.s2p")
 #todo initialize dc supplies for DSM
 
 scope.set_acq_time(num_periods*signal_period)

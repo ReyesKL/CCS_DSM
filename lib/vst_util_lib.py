@@ -409,7 +409,7 @@ def calc_td_powers(a1, b1, a2, b2, freqs, z0=50.0):
 class acpr_manager:
 
     def __init__(self, reference_signal, measurement_grid, 
-                 gaurd_bandwidth:float = 10e6, 
+                 guard_bandwidth:float = 10e6,
                  adjacent_channel_bandwidth:Union[float, None]=None):
         
         #Set the hidden properties for this object
@@ -424,8 +424,8 @@ class acpr_manager:
         else:
             raise TypeError("Measurement grid must be of type Grid")
        
-        #set the gaurd bandwidths 
-        self.gaurd_bandwidth = gaurd_bandwidth
+        #set the guard bandwidths
+        self.guard_bandwidth = guard_bandwidth
         self.adjacent_channel_bandwidth = adjacent_channel_bandwidth
 
         #now set the reference signal
@@ -438,7 +438,7 @@ class acpr_manager:
         f_sig_low = sig_freqs[0]; f_sig_high = sig_freqs[-1]
 
         #now identify the inner frequencies from the gaurd band requirements 
-        f1b = f_sig_low - self.gaurd_bandwidth; f2a = f_sig_high + self.gaurd_bandwidth
+        f1b = f_sig_low - self.guard_bandwidth; f2a = f_sig_high + self.guard_bandwidth
 
         #identify the bandwidth of the adjacent channels
         if self.adjacent_channel_bandwidth is None: 

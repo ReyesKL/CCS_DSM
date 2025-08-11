@@ -9,7 +9,7 @@ import pyvisa
 import numpy as np
 import skrf as rf
 from lib.waveform_generator import Multitone_Waveform_Generator as AWG
-from lib.vst_util_lib import acpr_manager
+from lib.vst_util_lib import acpr_manager, dbm2w
 """
 Initialize the VST 
 """
@@ -59,15 +59,30 @@ VstSys = MeasurementSystem(ccsURL, GATE_SOURCE_IDX, DRAIN_SOURCE_IDX, GATE_IDX_L
                             DRAIN_OSC_THRESHOLD, DRAIN_MAX_CURRENT, GATE_MIN_MAX_V, DRAIN_MIN_MAX_V, GATE_PINCH_OFF,
                             GATE_BIAS_INIT, DRAIN_BIAS_INIT, log)
 
+#load all tones on the measurement grid into the source (work-around at this point--just excite the entire grid)
+grid_indices = VstSys.measurement_grid.index(about_center=True)
+VstSys.source1.OutputEnabled = False
+VstSys.source1.PlayMultitone(grid_indices, np.full_like(grid_indices,0), np.full_like(grid_indices,0))
+VstSys.source2.OutputEnabled = False
+VstSys.source2.PlayMultitone(grid_indices, np.full_like(grid_indices,0), np.full_like(grid_indices,0))
+
 #create the VST tuners
 VstSys.create_tuners()
 source_tuner = VstSys.tuners[0]
+load_tuner   = VstSys.tuners[1]
+
+#assume that the source tuner is matched
+source_tuner.gamma_0 = source_tuner.grid.full_like(0, dtype="complex")
+load_tuner.gamma_0   = load_tuner.grid.full_like(0, dtype="complex")
 
 #load signal onto source 1
 awg = AWG("one_word", VstSys.measurement_grid, center_frequency=4.25e9, signal_bandwidth=10e6)
 sig, par_found = awg.get_signal_with_par(8)
 log.info(f"Loading signal with PAR of {par_found}dB")
-source_tuner.S0 = sig
+
+#perform tuner setup with the generated signal
+VstSys.setup_tuners(dbm2w(-20), with_signal=sig)
+
 # source_tuner.Source.on()
 acpr_calculator = acpr_manager(sig, VstSys.measurement_grid, guard_bandwidth=100e3)
 

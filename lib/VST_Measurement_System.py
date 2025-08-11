@@ -1460,12 +1460,19 @@ class MeasurementSystem:
         offset_frequency = self.source1.MultiToneFrequency 
 
         #create the source signal
-        source_signal = mts.MultitoneSignal.from_vst_signal(vst_sig, 
-                                                            self.tuner_grids[0], 
-                                                            power=signal_power,
-                                                            phase_in_deg=interpret_signal_phases_as_deg,
-                                                            source_grid_freq_step=offset_frequency, 
-                                                            source_grid_center_freq=center_frequency)
+        if isinstance(vst_sig, mts.MultitoneSignal):
+            #set the source signal to the input signal
+            source_signal = vst_sig
+            #update the signal power
+            source_signal.power = signal_power
+        else:# assume this is the original signal class
+            #load from the original measurement signal 
+            source_signal = mts.MultitoneSignal.from_vst_signal(vst_sig, 
+                                                                self.tuner_grids[0], 
+                                                                power=signal_power,
+                                                                phase_in_deg=interpret_signal_phases_as_deg,
+                                                                source_grid_freq_step=offset_frequency, 
+                                                                source_grid_center_freq=center_frequency)
 
         
         #get the reference signal to use for bootstrapping the tuner

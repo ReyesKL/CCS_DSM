@@ -96,6 +96,17 @@ load_tuner.S0  = sig
 # source_tuner.Source.on()
 # VstSys.load_signal(sig, 1)
 acpr_calculator = acpr_manager(sig, VstSys.measurement_grid, guard_bandwidth=100e3)
+ 
+#load the signal into source 2
+source = VstSys.source1
+rel_ph = np.array(list(map(float,source.RelativeMultiTones.RelativePhases))) 
+rel_amp = np.array(list(map(float, source.RelativeMultiTones.RelativeAmplitudes)))
+source1_power = source.OutputLevel
+
+#now transfer this signal to the second source
+source = VstSys.source2
+source.OutputLevel = source1_power
+source.PlayMultitone((list(sig.grid.index(about_center=True))), rel_amp, rel_ph)
 
 rm = pyvisa.ResourceManager()
 scope = RTP(rm, "TCPIP0::128.138.189.100::inst0::INSTR", log, "scope")

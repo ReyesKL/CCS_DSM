@@ -59,12 +59,16 @@ VstSys = MeasurementSystem(ccsURL, GATE_SOURCE_IDX, DRAIN_SOURCE_IDX, GATE_IDX_L
                             DRAIN_OSC_THRESHOLD, DRAIN_MAX_CURRENT, GATE_MIN_MAX_V, DRAIN_MIN_MAX_V, GATE_PINCH_OFF,
                             GATE_BIAS_INIT, DRAIN_BIAS_INIT, log)
 
-
+#create the VST tuners
+VstSys.create_tuners()
+source_tuner = VstSys.tuners[0]
 
 #load signal onto source 1
 awg = AWG("one_word", VstSys.measurement_grid, center_frequency=4.25e9, signal_bandwidth=10e6)
-sig = awg.get_signal_with_par(8)
-VstSys.load_signal(sig, 1)
+sig, par_found = awg.get_signal_with_par(8)
+log.info(f"Loading signal with PAR of {par_found}dB")
+source_tuner.S0 = sig
+# source_tuner.Source.on()
 acpr_calculator = acpr_manager(sig, VstSys.measurement_grid, guard_bandwidth=100e3)
 
 rm = pyvisa.ResourceManager()

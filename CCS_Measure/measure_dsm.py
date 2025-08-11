@@ -38,7 +38,7 @@ DRAIN_OSC_THRESHOLD = 100e-3
 GATE_STEP = 1e-2
 Z0 = 50
 
-DSM = False # true if we are running the DSM, false if PA is statically biased
+DSM = True # true if we are running the DSM, false if PA is statically biased
 
 signal_power = -20
 
@@ -48,7 +48,7 @@ signal_bw = 5e6
 oversample_rate = 4
 
 signal_period = 1/signal_bw
-num_periods = 2
+num_periods = 4
 
 
 ## Initialize the logger
@@ -78,6 +78,7 @@ VstSys.find_reflection_coefficients(source_1_power=-20, source_2_power=-20, retu
 source_tuner.gamma_0 = source_tuner.grid.full_like(0, dtype="complex")
 load_tuner.gamma_0   = load_tuner.grid.full_like(0, dtype="complex")
 
+
 #load signal onto source 1
 awg = AWG("one_word", VstSys.measurement_grid, center_frequency=4.25e9, signal_bandwidth=10e6)
 sig, par_found = awg.get_signal_with_par(8)
@@ -89,20 +90,26 @@ VstSys.setup_tuners(dbm2w(signal_power), with_signal=sig)
 #have the tuner perform autoleveling 
 source_tuner.move_to(gamma_des=source_tuner.gamma_0)
 
+#EXPLICITLY load the SIG?NAL into SOURCE 2
+load_tuner.S0  = sig
+
 # source_tuner.Source.on()
+# VstSys.load_signal(sig, 1)
 acpr_calculator = acpr_manager(sig, VstSys.measurement_grid, guard_bandwidth=100e3)
 
 rm = pyvisa.ResourceManager()
 scope = RTP(rm, "TCPIP0::128.138.189.100::inst0::INSTR", log, "scope")
-scope.fixture[0] = rf.Network(r"fixtures/output_fixture_dsm.s2p")
+scope.fixtures[0] = rf.Network(r"fixtures/output_fixture_dsm.s2p")
 #todo initialize dc supplies for DSM
 scope.set_acq_time(num_periods*signal_period)
 scope.set_sample_rate(oversample_rate*(f0))
 
 # create aligner and align the DSM and the RFPA
 if DSM:
-    aligner = DsmAligner(scope=scope, log =log, rf_source=vst.source1, signal_period=signal_period, pa_chn=1, dsm_chn=2)
-    aligner.align(debug=True, atol=1e-10, n_its=20)
+    source_tuner.Source.on()
+    load_tuner.Source.on()
+    aligner = DsmAligner(scope=scope, log =log, rf_source=VstSys.source1, signal_period=signal_period, pa_chn=1, dsm_chn=2)
+    aligner.align(debug=True, atol=1e-9, n_its=20)
 
 # create the sweep variables
 pwr_levels = SweepVar.from_linspace("pwr_levels", -10, 10, 11)

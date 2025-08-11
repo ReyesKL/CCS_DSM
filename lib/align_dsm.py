@@ -1,5 +1,6 @@
 import numpy as np
 import scipy
+import scipy.fft as fft
 import matplotlib.pyplot as plt
 
 class DsmAligner:
@@ -31,15 +32,17 @@ class DsmAligner:
             _, dsm_wvfm = self.scope.get_td_data(self.dsm_chn, rerun=False)
             # get envelope of rf waveform
             pa_env_wvfm = np.abs(scipy.signal.hilbert(pa_wvfm))
-            # pa_env_wvfm = pa_env_wvfm / np.max(pa_env_wvfm)
+            pa_env_wvfm = pa_env_wvfm / np.max(pa_env_wvfm)
 
             # #############################
             # # for testing only
-            # dsm_wvfm = np.abs(scipy.signal.hilbert(dsm_wvfm))
-            # # dsm_wvfm = dsm_wvfm / np.max(dsm_wvfm)
+            dsm_wvfm = np.abs(scipy.signal.hilbert(dsm_wvfm))
+            dsm_wvfm = dsm_wvfm / np.max(dsm_wvfm)
             # # for testing only
             # #############################
 
+
+            # self.filter_and_decimate(t, pa_env_wvfm)
 
 
             # cross correlate the wave forms and find the delay
@@ -78,3 +81,10 @@ class DsmAligner:
             # need to define some convergence criteria
             # need to possibly upsample/filter the waveforms
 
+
+    def filter_and_decimate(self, t, v):
+        v_f = fft.fftshift(fft.fft(v))
+        f = fft.fftshift(fft.fftfreq(t))
+        plt.plot(f/1e9, v_f)
+        plt.grid()
+        plt.show()

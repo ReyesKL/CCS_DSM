@@ -40,6 +40,8 @@ Z0 = 50
 
 DSM = False # true if we are running the DSM, false if PA is statically biased
 
+signal_power = -20
+
 #hardcoded for now, used to set up oscilloscope
 f0 = 4.5e9
 signal_bw = 5e6
@@ -81,7 +83,10 @@ sig, par_found = awg.get_signal_with_par(8)
 log.info(f"Loading signal with PAR of {par_found}dB")
 
 #perform tuner setup with the generated signal
-VstSys.setup_tuners(dbm2w(-20), with_signal=sig)
+VstSys.setup_tuners(dbm2w(signal_power), with_signal=sig)
+
+#have the tuner perform autoleveling 
+source_tuner.move_to(gamma_des=source_tuner.gamma_0)
 
 # source_tuner.Source.on()
 acpr_calculator = acpr_manager(sig, VstSys.measurement_grid, guard_bandwidth=100e3)
@@ -90,10 +95,8 @@ rm = pyvisa.ResourceManager()
 scope = RTP(rm, "TCPIP0::128.138.189.100::inst0::INSTR", log, "scope")
 scope.fixture[0] = rf.Network(r"fixtures/output_fixture_dsm.s2p")
 #todo initialize dc supplies for DSM
-
 scope.set_acq_time(num_periods*signal_period)
 scope.set_sample_rate(oversample_rate*(f0))
-
 
 # create aligner and align the DSM and the RFPA
 if DSM:

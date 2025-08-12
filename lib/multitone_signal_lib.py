@@ -1,8 +1,8 @@
 import numpy as np
 import xarray as xr
-from lib.active_tuner_grid_lib import Grid, StaticGridSource, GridGenerator, ExistsAtFrequencies
+from lib.active_tuner_grid_lib import Grid, StaticGridSource, GridGenerator, ExistsAtFrequencies, OrMask
 from typing import Union
-import os, yaml
+import os, yaml, h5py
 from datetime import datetime
 
 #TODO: At some point in the future, the SignalDefinition class and MultitoneSignal classes should be combined into one entity.
@@ -82,6 +82,74 @@ class SignalDefinition:
 
 class MultitoneSignal:
     #methods for building multitone signals
+    @classmethod
+    def load(cls, file_path:str, to_grid:Grid, name:str = "new_signal"):
+        """
+        Initial file loader for the test signal 
+        """
+
+        #Raise a file not found error if the path specified does not exist
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Could not find target file: {file_path}")
+        elif not os.access(file_path, os.R_OK):
+            raise RuntimeError("File found, but cannot be opened for reading.")
+        
+        #If all checks passed then go ahead and open the file for reading 
+        with h5py.File(file_path, "r") as file:
+            #get the signal attributes 
+            tone_vals = file["A0"][:]
+            frequencies = file["Frequencies"][:]
+            indices     = file["Tone_Indices"][:]
+            num_tones   = tone_vals.size
+            power       = file.attrs["Power"]
+            power_type  = file.attrs["Power_Type"]
+            z0          = file.attrs["Z0"]
+            auto_level  = file.attrs["Auto_Level"]
+        
+        #Check to see if all the frequencies stored in the signal exist on the specified grid
+        grid_freqs = to_grid.freqs
+        if not np.alltrue(np.isin(frequencies, grid_freqs)):
+            raise RuntimeError("Could not map signal to specified grid. Frequencies don't align.")
+        
+        #perform the signal mapping
+        sig_mask = np.isin(grid_freqs, frequencies)
+
+        #build the signal grid
+        grid_source = None
+        grid_mod = OrMask(sig_mask)
+        grid_gen = GridGenerator(grid_source, grid_mod)
+        sig_grid = Grid.generate(name, using=grid_gen, on=to_grid)
+
+        #now build the signal
+        return cls(num_tones, sig_grid, 
+                   power=power, power_type=power_type, with_tone_vals=tone_vals, Z0=z0, auto_level=auto_level)
+
+    @classmethod
+    def single_tone(cls, at_frequency:float, on_grid:Grid, grid_name:str="single_tone_signal", power:float=1e-3, phase:float=0, power_type:str="peak", Z0:float=50, auto_level:bool=True, deg:bool=True):
+        
+        #find the desired frequency on the specified grid
+        freq_idx = np.argmin(np.abs(at_frequency - on_grid.freqs))
+
+        #create a mask of the prior grid and set the desired frequency to true
+        grid_mask = on_grid.full_like(False,dtype="bool")
+        grid_mask[freq_idx] = True
+
+        #now create a simple signal grid
+        grid_source = None
+        grid_mod    = OrMask(grid_mask)
+        grid_gen    = GridGenerator(grid_source, grid_mod)
+        sig_grid    = Grid.generate(grid_name,using=grid_gen,on=on_grid)
+
+        #make sure the phase is in the right units
+        if deg:
+            phase = np.deg2rad(phase)
+
+        #Initialize the center tone
+        A0_init = np.exp(1j*phase)
+        
+        #return the class
+        return cls(1, sig_grid, power=power, power_type=power_type, with_tone_vals=A0_init, Z0=Z0, auto_level=auto_level)
+    
     @classmethod
     def from_vst_signal(cls, vst_sig, with_grid:Grid, power:float=1e-3, power_type:str="peak", 
                  Z0:float=50, using_ref_grid:Union[Grid,None]=None,
@@ -236,27 +304,27 @@ class MultitoneSignal:
         return cls(int(num_tones), with_grid, power=float(0), 
                    power_type="average", with_tone_vals=sig_data)
     
-    @classmethod
-    def load(cls, file, grid, grid_name:Union[str,None]):
-        #Load a signal from an h5 file
-        sig_def = SignalDefinition.load(file)
+    # @classmethod
+    # def load(cls, file, grid, grid_name:Union[str,None]):
+    #     #Load a signal from an h5 file
+    #     sig_def = SignalDefinition.load(file)
 
-        #get the signal's grid
-        if not grid_name is None:
-            grid_src = StaticGridSource(sig_def.frequencies)
-            grid_gen = GridGenerator(grid_src)
-            signal_grid = Grid.generate(grid_name, using=grid_gen, on=grid)
-        else: #the grid provided is the target grid
-            signal_grid = grid
+    #     #get the signal's grid
+    #     if not grid_name is None:
+    #         grid_src = StaticGridSource(sig_def.frequencies)
+    #         grid_gen = GridGenerator(grid_src)
+    #         signal_grid = Grid.generate(grid_name, using=grid_gen, on=grid)
+    #     else: #the grid provided is the target grid
+    #         signal_grid = grid
 
-        #now build the signal
-        return cls(sig_def.num_tones, 
-                   signal_grid, 
-                   power=sig_def.power,
-                   power_type=sig_def.power_type,
-                   with_tone_vals=sig_def.a0, 
-                   Z0=sig_def.z0,
-                   auto_level=sig_def.auto_level)
+    #     #now build the signal
+    #     return cls(sig_def.num_tones, 
+    #                signal_grid, 
+    #                power=sig_def.power,
+    #                power_type=sig_def.power_type,
+    #                with_tone_vals=sig_def.a0, 
+    #                Z0=sig_def.z0,
+    #                auto_level=sig_def.auto_level)
 
     #Class Validator Methods
     @staticmethod
@@ -400,6 +468,40 @@ class MultitoneSignal:
         #update the signal 
         self.__a0 *= np.sqrt(power_scale_factor)
     
+    #method for saving the signal 
+    def save(self, file_path, index_to:Union[Grid,None]=None):
+        
+        # If the file exists, delete the file
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+        #Get the signal indexing relative to some grid
+        if index_to is None:
+            index_to = self.grid.root
+        
+        #index the signal relative to the desired grid
+        signal_indices = index_to.cast_index(self.grid, about_center=True)
+        
+        # Next we will create the hdf5 file
+        with h5py.File(file_path,"w") as file:
+            #create the groups of data that we will write the 
+            grid_grp   = file.create_group("Reference_Grid")
+            #now save the signal data to the file
+            file.create_dataset("A0", data=self.a0)
+            file.create_dataset("Frequencies", data=self.grid.freqs)
+            file.create_dataset("Tone_Indices", data=signal_indices)
+            file.attrs.create("Z0", self.Z0)
+            file.attrs.create("Power", self.power)
+            file.attrs.create("Power_Type", self.power_type)
+            file.attrs.create("Auto_Level", self.auto_level)
+
+            #save the reference grid data
+            grid_grp.create_dataset("Frequencies", data=index_to.freqs)
+            grid_grp.attrs.create("Frequency_Resolution", index_to.freqs)
+            grid_grp.attrs.create("Name", index_to.name)
+
+
+
     #method for writing to data file for AWRDE and ADS
     def write_to_AWR_sig_file(self, file_path, min_power=-100):
         #write the excitation data file to the desired file path
@@ -629,8 +731,9 @@ class MultitoneSignal:
     
     @auto_level.setter
     def auto_level(self, new_val:bool)->None:
-        if isinstance(new_val, bool):
-            self.__auto_level = new_val
+        # if isinstance(new_val, bool):
+        #     self.__auto_level = new_val
+        self.__auto_level = bool(new_val)
 
     @property
     def Z0(self)->float:

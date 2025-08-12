@@ -90,7 +90,7 @@ VstSys.setup_tuners(dbm2w(signal_power), with_signal=sig)
 #have the tuner perform autoleveling 
 source_tuner.move_to(gamma_des=source_tuner.gamma_0)
 
-#EXPLICITLY load the SIG?NAL into SOURCE 2
+#EXPLICITLY load the SIGNAL into SOURCE 2
 load_tuner.S0  = sig
 
 # source_tuner.Source.on()

@@ -2,6 +2,25 @@ import numpy as np
 import scipy
 import scipy.fft as fft
 import matplotlib.pyplot as plt
+from lib.RKL_TOOLS import find_nearest_idx
+
+
+def filter_and_decimate(t, v):
+
+    dt = t[1] - t[0]
+    t_max = np.max(t)
+    t_min = np.min(t)
+    v_f = fft.fftshift(fft.rfft(v))
+    f = fft.fftshift(fft.rfftfreq(v.size, dt))
+
+    f_max_idx = find_nearest_idx(f, 100e6)
+    v_f[f_max_idx:] = 0
+    v = fft.ifft(fft.ifftshift(v_f))
+    v = scipy.signal.decimate(v, 10)
+    t = np.linspace(t_min, t_max, v.size)
+
+    return t, v
+
 
 class DsmAligner:
     def __init__(self, scope, log, rf_source, signal_period, pa_chn, dsm_chn):
@@ -27,22 +46,25 @@ class DsmAligner:
             # measure both waveforms
             self.scope.auto_scale(self.pa_chn)
             self.scope.auto_scale(self.dsm_chn)
-            t, pa_wvfm = self.scope.get_td_data(self.pa_chn)
+            t, pa_wvfm = self.scope.get_td_data(self.pa_chn, update_view=False)
             pa_wvfm = self.scope.de_embed_td_data(self.pa_chn, t, pa_wvfm)
-            _, dsm_wvfm = self.scope.get_td_data(self.dsm_chn, rerun=False)
+
+            t, dsm_wvfm = self.scope.get_td_data(self.dsm_chn, update_view=False, rerun=False)
+
             # get envelope of rf waveform
-            pa_env_wvfm = np.abs(scipy.signal.hilbert(pa_wvfm))
+            pa_env_wvfm = np.abs(scipy.signal.hilbert(np.abs(pa_wvfm)))
             pa_env_wvfm = pa_env_wvfm / np.max(pa_env_wvfm)
 
             # #############################
             # # for testing only
-            dsm_wvfm = np.abs(scipy.signal.hilbert(dsm_wvfm))
-            dsm_wvfm = dsm_wvfm / np.max(dsm_wvfm)
+            # dsm_wvfm = np.abs(scipy.signal.hilbert(np.abs(dsm_wvfm)))
+            # dsm_wvfm = dsm_wvfm / np.max(dsm_wvfm)
             # # for testing only
             # #############################
-
-
-            # self.filter_and_decimate(t, pa_env_wvfm)
+            t, pa_env_wvfm = filter_and_decimate(t, pa_env_wvfm)
+            t, dsm_wvfm = filter_and_decimate(t, dsm_wvfm)
+            dsm_wvfm = dsm_wvfm / np.max(dsm_wvfm)
+            dsm_wvfm -= np.min(dsm_wvfm)
 
 
             # cross correlate the wave forms and find the delay
@@ -81,10 +103,3 @@ class DsmAligner:
             # need to define some convergence criteria
             # need to possibly upsample/filter the waveforms
 
-
-    def filter_and_decimate(self, t, v):
-        v_f = fft.fftshift(fft.fft(v))
-        f = fft.fftshift(fft.fftfreq(t))
-        plt.plot(f/1e9, v_f)
-        plt.grid()
-        plt.show()

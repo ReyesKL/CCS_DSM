@@ -76,7 +76,7 @@ def calculate_am_xm(v_in_f: np.ndarray, v_out_f: np.ndarray, meas_type="amp"):
     pin_t = np.abs(v_in_t**2)
     pout_t = np.abs(v_out_t**2)
     gain_t = pout_t / pin_t
-    am_am = np.abs(gain_t)
+    am_am = 10*np.log10(np.abs(gain_t))
     am_pm = np.angle(gain_t, deg=True)
     if meas_type == "amp":
         return pin_t, am_am

@@ -4,6 +4,7 @@ from statsmodels.tsa.vector_ar.plotting import plot_with_error
 from lib.VST_Measurement_System import MeasurementSystem
 from lib.logger_setup import setup_logging
 from lib.external_instrs.RTP import RTP
+from lib.external_instrs.E34401A import E34401A
 from lib.align_dsm import DsmAligner
 from lib.SweepVar import SweepVar, Sweep, sweep_to_xarray_from_func
 import pyvisa
@@ -13,6 +14,7 @@ from lib.waveform_generator import Multitone_Waveform_Generator as AWG
 from lib.vst_util_lib import acpr_manager, dbm2w
 from lib.RKL_TOOLS import find_nearest_idx, normalize, calculate_am_xm
 from lib.multitone_signal_lib import MultitoneSignal
+import xarray as xr
 """
 Initialize the VST 
 """
@@ -42,7 +44,7 @@ GATE_STEP = 1e-2
 Z0 = 50
 
 DSM = False # true if we are running the DSM, false if PA is statically biased
-
+voltage_lvl = 26
 
 
 #this is the signal power that we want to measure.
@@ -83,7 +85,7 @@ source_tuner = VstSys.tuners[0]
 load_tuner   = VstSys.tuners[1]
 
 #assume that the source tuner is matched
-VstSys.find_reflection_coefficients(source_1_power=-20, source_2_power=-20, return_power_lvl=-20, use_grid="tuner")
+VstSys.find_reflection_coefficients(source_1_power=-30, source_2_power=-30, return_power_lvl=-30, use_grid="tuner")
 source_tuner.gamma_0 = source_tuner.grid.full_like(0, dtype="complex")
 load_tuner.gamma_0   = load_tuner.grid.full_like(0, dtype="complex")
 
@@ -130,6 +132,14 @@ scope.fixtures[0] = rf.Network(r"fixtures/output_fixture_dsm.s2p")
 #setup the oscilloscope sampling and horizontal timebase
 scope.set_acq_time(num_periods*signal_period)
 scope.set_sample_rate(oversample_rate*(f0))
+
+
+# initialize the current meters
+bias_current_meter = E34401A(rm, "GPIB0::29::INSTR", log, "meter1")
+main_current_meter = E34401A(rm, "GPIB0::19::INSTR", log, "meter1")
+bias_current_meter.auto_range()
+main_current_meter.auto_range()
+
 
 #initialize the aligner
 aligner = DsmAligner(scope=scope,
@@ -180,6 +190,8 @@ def measure(pwr_level):
 
     t_scope, rf_td_wavefrom  = scope.get_td_data(rf_chan)
     _, dsm_td_waveform = scope.get_td_data(dsm_chan)
+    i_bias = bias_current_meter.meas_dc_current()
+    i_main = main_current_meter.meas_dc_current()
 
     # measuredSpectra = VstSys.get_rf_data()
     a1 = VstSys.measuredSpectra[0, :]
@@ -208,15 +220,15 @@ def measure(pwr_level):
         "Pout_db": pout_db,
         "Pin_db": pin_db,
         "Gain_db": gain_db,
+        "i_bias": i_bias,
+        "i_main": i_main,
         # "ACPR_dbc": acpr,
-        "am-am": am_am,
-        "am-pm": am_pm,
+        "am_am": am_am,
+        "am_pm": am_pm,
         "pin_spectrum_db": pin_spectrum_db,
         "pout_spectrum_db": pout_spectrum_db,
         "pa_td_waveform": rf_td_wavefrom,
         "dsm_td_waveform": dsm_td_waveform,
-        "am_am": am_am,
-        "am_pm": am_pm
     }
     return data
 
@@ -224,6 +236,8 @@ output_dims = {
         "Pout_db": [],
         "Pin_db": [],
         "Gain_db": [],
+        "i_bias": [],
+        "i_main": [],
         # "ACPR_dbc": [("freqs", freqs)], # todo should this be a list?
         "pin_spectrum_db": [("frequency", freqs)],
         "pout_spectrum_db": [("frequency", freqs)],
@@ -235,7 +249,10 @@ output_dims = {
 
 ds = sweep_to_xarray_from_func(sweep, measure, output_dims=output_dims)
 print(ds)
-
+ds.attrs["signal"] = "CW"
+ds.attrs["voltage_level"] = voltage_lvl
+ds.attrs["dynamic_supply"] = DSM
+ds.to_netcdf("test.h5", engine="h5netcdf", invalid_netcdf=True)
 print(f"pout_db: {ds.Pout_db.values}")
 print(f"pin_db: {ds.Pin_db.values}")
 print(f"gain_db: {ds.Gain_db.values}")

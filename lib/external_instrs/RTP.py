@@ -34,7 +34,7 @@ class RTP:
         self.rtp.write(f"FORM:DATA REAL,32")
         dat = self.rtp.query_binary_values(f"CHAN{channel}:WAV1:DATA?")
         # dat = self.rtp.query_ascii_values(f"CHAN{channel}:WAV1:DATA?")
-
+        dat = np.array(dat)
         # dat = dat.split(',')
         # dat = list(float(x) for x in dat)
         header = self.rtp.query(f"CHAN{channel}:WAV1:DATA:HEAD?").strip()

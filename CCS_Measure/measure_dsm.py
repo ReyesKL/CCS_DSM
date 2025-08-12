@@ -40,13 +40,13 @@ Z0 = 50
 
 DSM = True # true if we are running the DSM, false if PA is statically biased
 
-signal_power = -20
+#this is the signal power that we want to measure.
+signal_power = 0
 
 #hardcoded for now, used to set up oscilloscope
 f0 = 4.5e9
 signal_bw = 5e6
 oversample_rate = 4
-
 signal_period = 1/signal_bw
 num_periods = 4
 
@@ -60,6 +60,7 @@ VstSys = MeasurementSystem(ccsURL, GATE_SOURCE_IDX, DRAIN_SOURCE_IDX, GATE_IDX_L
                             GATE_ANALYZER_IDX, DRAIN_ANALYZER_IDX, QUIESCENT_GATE, QUIESCENT_DRAIN, GATE_CURRENT_LIMIT,
                             DRAIN_OSC_THRESHOLD, DRAIN_MAX_CURRENT, GATE_MIN_MAX_V, DRAIN_MIN_MAX_V, GATE_PINCH_OFF,
                             GATE_BIAS_INIT, DRAIN_BIAS_INIT, log)
+
 
 #load all tones on the measurement grid into the source (work-around at this point--just excite the entire grid)
 grid_indices = VstSys.measurement_grid.index(about_center=True)
@@ -80,9 +81,9 @@ load_tuner.gamma_0   = load_tuner.grid.full_like(0, dtype="complex")
 
 
 #load signal onto source 1
-awg = AWG("one_word", VstSys.measurement_grid, center_frequency=4.25e9, signal_bandwidth=10e6)
-sig, par_found = awg.get_signal_with_par(8)
-log.info(f"Loading signal with PAR of {par_found}dB")
+awg = AWG("one_word", VstSys.measurement_grid, center_frequency=4.25e9, signal_bandwidth=2e6)
+sig, par_found = awg.get_signal_with_par(3)
+log.info(f"Loading signal with PAR of {par_found:.2f}dB")
 
 #perform tuner setup with the generated signal
 VstSys.setup_tuners(dbm2w(signal_power), with_signal=sig)
@@ -109,18 +110,27 @@ source = VstSys.source2
 source.OutputLevel = source1_power
 source.PlayMultitone((list(sig_indices)), rel_amp, rel_ph)
 
+#initalize the visa interface
 rm = pyvisa.ResourceManager()
+
+# initialize the scope
 scope = RTP(rm, "TCPIP0::128.138.189.100::inst0::INSTR", log, "scope")
+# load the output fixture into the scope object for de-embedding
 scope.fixtures[0] = rf.Network(r"fixtures/output_fixture_dsm.s2p")
-#todo initialize dc supplies for DSM
+
+#setup the oscilloscope sampling and horizontal timebase
 scope.set_acq_time(num_periods*signal_period)
 scope.set_sample_rate(oversample_rate*(f0))
 
+#initialize the aligner
+aligner = DsmAligner(scope=scope, log=log, rf_source=VstSys.source1, signal_period=signal_period, pa_chn=1, dsm_chn=3)
+
+#todo initialize dc supplies for DSM
+
 # create aligner and align the DSM and the RFPA
 if DSM:
+    #turn on the rf source
     source_tuner.Source.on()
-    load_tuner.Source.on()
-    aligner = DsmAligner(scope=scope, log =log, rf_source=VstSys.source1, signal_period=signal_period, pa_chn=1, dsm_chn=2)
     aligner.align(debug=True, atol=1e-9, n_its=20)
 
 # create the sweep variables
@@ -134,8 +144,7 @@ freqs = VstSys.freqs
 # measurement function to be called for each point in the sweep
 def measure(pwr_levels):
 
-    # VstSys.source1.load_signal(signals[signal_i])
-    # VstSys.iteratively_set_power_level(pwr_level)
+    #todo set power level
 
     measuredSpectra = VstSys.get_rf_data()
     a1 = measuredSpectra[0, :]
@@ -145,14 +154,14 @@ def measure(pwr_levels):
 
     pout = (np.abs(b2**2)) / 2*Z0
     pin = (np.abs(a1**2)) / 2*Z0
-    pout_db = 10*np.log10(pout) + 30
-    pin_db = 10*np.log10(pin) + 30
+    pout_db = 10*np.log10(np.sum(pout)) + 30
+    pin_db = 10*np.log10(np.sum(pin)) + 30
     gain_db = pout_db - pin_db
 
     #todo get dc data from audrey
     pdc = np.ones_like(freqs)
     pae = np.ones_like(freqs)
-    acpr = np.ones_like(freqs)
+    acpr = acpr_calculator.calc_acpr(pout)
     am_am = np.ones_like(freqs)
     am_pm = np.ones_like(freqs)
     # compute PAE, Pdc, Pout, Pin, Gain, IMD3/ACPR, AM_AM, AM_PM
@@ -167,6 +176,7 @@ def measure(pwr_levels):
         "am-pm": am_pm
     }
 
+#todo fix these dims
 output_dims = {
         "PAE_p": [("freqs", freqs)],
         "Pout_db": [("freqs", freqs)],

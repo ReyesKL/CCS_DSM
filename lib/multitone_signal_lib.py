@@ -125,10 +125,16 @@ class MultitoneSignal:
                    power=power, power_type=power_type, with_tone_vals=tone_vals, Z0=z0, auto_level=auto_level)
 
     @classmethod
-    def single_tone(cls, at_frequency:float, on_grid:Grid, grid_name:str="single_tone_signal", power:float=1e-3, phase:float=0, power_type:str="peak", Z0:float=50, auto_level:bool=True, deg:bool=True):
+    def single_tone(cls, at_frequency:float, on_grid:Grid, grid_name:str="single_tone_signal", power:float=1e-3, phase:float=0, power_type:str="peak", Z0:float=50, auto_level:bool=True, deg:bool=True, side_tones_amp:Union[float,None]=None, side_tones_amp_db:bool=True):
         
         #find the desired frequency on the specified grid
         freq_idx = np.argmin(np.abs(at_frequency - on_grid.freqs))
+
+        #create side-tones to help with alignment
+        if side_tones_amp is not None:
+            freq_idx = np.array([freq_idx-1, freq_idx, freq_idx+1])
+            if side_tones_amp_db: 
+                side_tones_amp = 10**(side_tones_amp / 10)
 
         #create a mask of the prior grid and set the desired frequency to true
         grid_mask = on_grid.full_like(False,dtype="bool")
@@ -147,8 +153,17 @@ class MultitoneSignal:
         #Initialize the center tone
         A0_init = np.exp(1j*phase)
         
+        #make sure that the initialized signal is an array 
+        if side_tones_amp is not None:
+            A0_init = np.array([side_tones_amp, A0_init, side_tones_amp], dtype="complex")
+        else:
+            A0_init = np.array(A0_init, dtype="complex")
+
+        #set the number of tones
+        num_tones = A0_init.size
+        
         #return the class
-        return cls(1, sig_grid, power=power, power_type=power_type, with_tone_vals=A0_init, Z0=Z0, auto_level=auto_level)
+        return cls(num_tones, sig_grid, power=power, power_type=power_type, with_tone_vals=A0_init, Z0=Z0, auto_level=auto_level)
     
     @classmethod
     def from_vst_signal(cls, vst_sig, with_grid:Grid, power:float=1e-3, power_type:str="peak", 

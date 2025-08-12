@@ -515,8 +515,6 @@ class MultitoneSignal:
             grid_grp.attrs.create("Frequency_Resolution", index_to.freqs)
             grid_grp.attrs.create("Name", index_to.name)
 
-
-
     #method for writing to data file for AWRDE and ADS
     def write_to_AWR_sig_file(self, file_path, min_power=-100):
         #write the excitation data file to the desired file path

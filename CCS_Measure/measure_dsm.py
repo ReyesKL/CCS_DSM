@@ -91,7 +91,7 @@ load_tuner.gamma_0   = load_tuner.grid.full_like(0, dtype="complex")
 #load signal onto source 1
 # awg = AWG("one_word", VstSys.measurement_grid, center_frequency=4.25e9, signal_bandwidth=2e6)
 # sig, par_found = awg.get_signal_with_par(3)
-sig = MultitoneSignal.single_tone(4.25e9, VstSys.measurement_grid, power=dbm2w(signal_power))
+sig = MultitoneSignal.single_tone(4.25e9, VstSys.measurement_grid, power=dbm2w(signal_power), side_tones_amp=-30)
 # log.info(f"Loading signal with PAR of {par_found:.2f}dB")
 
 #perform tuner setup with the generated signal

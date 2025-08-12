@@ -679,8 +679,8 @@ class MultitoneSignal:
             self.__offset_amplitudes_to_power_level()
 
     @property
-    def a0(self)->np.ndarray:
-        return self.__a0
+    def a0(self)->np.ndarray[complex]:
+        return np.array(self.__a0, dtype="complex")
     
     @a0.setter
     def a0(self,new_vals:np.ndarray)->None:
@@ -697,17 +697,17 @@ class MultitoneSignal:
             self.__offset_amplitudes_to_power_level()
     
     @property
-    def a0_normalized(self)->np.ndarray:
+    def a0_normalized(self)->np.ndarray[complex]:
         #return the normalized tone values to the peak tone value
-        return self.__a0 / np.max(np.abs(self.__a0))
+        return np.array(self.__a0 / np.max(np.abs(self.__a0)), dtype="complex")
 
     @property
-    def v0(self)->np.ndarray:
+    def v0(self)->np.ndarray[complex]:
         #Returns the tone values as standard power waves (what the vst bench measures)
         #a1 = (V+I*Z0)/2*sqrt(Z0)
         #v+ = (V+I*Z0)/2 (from Pozar)
         #so v+ = a1 * sqrt(Z0)
-        return self.__a0 * np.sqrt(self.__Z0)
+        return np.array(self.__a0 * np.sqrt(self.__Z0), dtype="complex")
     
     @v0.setter
     def v0(self, new_vals:np.ndarray)->None:
@@ -724,21 +724,21 @@ class MultitoneSignal:
             self.__offset_amplitudes_to_power_level()
 
     @property
-    def v0_normalized(self)->np.ndarray:
+    def v0_normalized(self)->np.ndarray[complex]:
         #return the normalized values of v0
-        return self.a0_normalized * np.sqrt(self.__Z0)
+        return np.array(self.a0_normalized * np.sqrt(self.__Z0), dtype="complex")
 
     @property
     def p0(self)->np.ndarray[complex]:
         #returns the real power of each tone 
-        return np.abs(self.__a0)**2 / 2
+        return np.array(np.abs(self.__a0)**2 / 2, dtype="complex")
 
     @property
-    def p0_normalized(self)->np.ndarray:
+    def p0_normalized(self)->np.ndarray[complex]:
         #returns the normalized power of each tone.
         #note that power is normally a0/2 however this is left out for 
         #relative power values
-        return np.abs(self.a0_normalized)**2
+        return np.array(np.abs(self.a0_normalized)**2, dtype="complex")
 
     @property
     def auto_level(self)->bool:

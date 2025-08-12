@@ -207,6 +207,7 @@ class SignalViabilityMask:
         P0 = np.abs(A0)**2 / (2 * 50)
 
         #convert to dBm
+        # P0 = np.where(P0 <= 0, 1e-10, P0) # avoid divide by zero
         P0 = 10*np.log10(P0) + 30
 
         #generate the mask as all values of P0 greater than the

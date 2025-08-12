@@ -1,3 +1,4 @@
+from matplotlib import pyplot as plt
 from statsmodels.tsa.vector_ar.plotting import plot_with_error
 
 from lib.VST_Measurement_System import MeasurementSystem
@@ -10,6 +11,8 @@ import numpy as np
 import skrf as rf
 from lib.waveform_generator import Multitone_Waveform_Generator as AWG
 from lib.vst_util_lib import acpr_manager, dbm2w
+from lib.RKL_TOOLS import find_nearest_idx, normalize, calculate_am_xm
+from lib.multitone_signal_lib import MultitoneSignal
 """
 Initialize the VST 
 """
@@ -38,7 +41,9 @@ DRAIN_OSC_THRESHOLD = 100e-3
 GATE_STEP = 1e-2
 Z0 = 50
 
-DSM = True # true if we are running the DSM, false if PA is statically biased
+DSM = False # true if we are running the DSM, false if PA is statically biased
+
+
 
 #this is the signal power that we want to measure.
 signal_power = 0
@@ -49,6 +54,9 @@ signal_bw = 5e6
 oversample_rate = 4
 signal_period = 1/signal_bw
 num_periods = 4
+
+rf_chan = 1
+dsm_chan = 3
 
 
 ## Initialize the logger
@@ -81,9 +89,10 @@ load_tuner.gamma_0   = load_tuner.grid.full_like(0, dtype="complex")
 
 
 #load signal onto source 1
-awg = AWG("one_word", VstSys.measurement_grid, center_frequency=4.25e9, signal_bandwidth=2e6)
-sig, par_found = awg.get_signal_with_par(3)
-log.info(f"Loading signal with PAR of {par_found:.2f}dB")
+# awg = AWG("one_word", VstSys.measurement_grid, center_frequency=4.25e9, signal_bandwidth=2e6)
+# sig, par_found = awg.get_signal_with_par(3)
+sig = MultitoneSignal.single_tone(4.25e9, VstSys.measurement_grid, power=dbm2w(signal_power))
+# log.info(f"Loading signal with PAR of {par_found:.2f}dB")
 
 #perform tuner setup with the generated signal
 VstSys.setup_tuners(dbm2w(signal_power), with_signal=sig)
@@ -123,7 +132,12 @@ scope.set_acq_time(num_periods*signal_period)
 scope.set_sample_rate(oversample_rate*(f0))
 
 #initialize the aligner
-aligner = DsmAligner(scope=scope, log=log, rf_source=VstSys.source1, signal_period=signal_period, pa_chn=1, dsm_chn=3)
+aligner = DsmAligner(scope=scope,
+                     log=log,
+                     rf_source=VstSys.source1,
+                     signal_period=signal_period,
+                     pa_chn=rf_chan,
+                     dsm_chn=dsm_chan)
 
 #todo initialize dc supplies for DSM
 
@@ -134,59 +148,119 @@ if DSM:
     aligner.align(debug=True, atol=1e-9, n_its=20)
 
 # create the sweep variables
-pwr_levels = SweepVar.from_linspace("pwr_levels", -10, 10, 11)
+pwr_levels = SweepVar.from_linspace("pwr_level", -10, 0, 2)
 # signals_i = SweepVar.from_list("signals", [0,1,2,3])
 
 #create the sweep object
 sweep = Sweep([pwr_levels], inner_to_outer=True)
 
+#get freqs for creating xarrays
 freqs = VstSys.freqs
+
+# dummy again for creating xarrays
+t_scope, rf_td_wavefrom  = scope.get_td_data(rf_chan)
+
+# dummy again for creating xarrays
+measuredSpectra = VstSys.get_rf_data()
+a1 = measuredSpectra[0, :]
+b1 = measuredSpectra[1, :]
+a2 = measuredSpectra[2, :]
+b2 = measuredSpectra[3, :]
+pout = (np.abs(b2**2)) / (2*Z0)
+pin = (np.abs(a1**2)) / (2*Z0)
+pin_t, _ = calculate_am_xm(pin, pout, meas_type="amp")
+
+
 # measurement function to be called for each point in the sweep
-def measure(pwr_levels):
+def measure(pwr_level):
 
     #todo set power level
+    sig.power = dbm2w(pwr_level)
+    source_tuner.move_to()
 
-    measuredSpectra = VstSys.get_rf_data()
-    a1 = measuredSpectra[0, :]
-    b1 = measuredSpectra[1, :]
-    a2 = measuredSpectra[2, :]
-    b2 = measuredSpectra[3, :]
+    t_scope, rf_td_wavefrom  = scope.get_td_data(rf_chan)
+    _, dsm_td_waveform = scope.get_td_data(dsm_chan)
 
-    pout = (np.abs(b2**2)) / 2*Z0
-    pin = (np.abs(a1**2)) / 2*Z0
+    # measuredSpectra = VstSys.get_rf_data()
+    a1 = VstSys.measuredSpectra[0, :]
+    b1 = VstSys.measuredSpectra[1, :]
+    a2 = VstSys.measuredSpectra[2, :]
+    b2 = VstSys.measuredSpectra[3, :]
+
+    pout = (np.abs(b2)**2) / (2*Z0)
+
+    pin = (np.abs(a1)**2) / (2*Z0)
+
+    pin_spectrum_db = 10*np.log10(pin) + 30
+    pout_spectrum_db = 10*np.log10(pout) + 30
+
     pout_db = 10*np.log10(np.sum(pout)) + 30
     pin_db = 10*np.log10(np.sum(pin)) + 30
     gain_db = pout_db - pin_db
 
-    #todo get dc data from audrey
-    pdc = np.ones_like(freqs)
-    pae = np.ones_like(freqs)
-    acpr = acpr_calculator.calc_acpr(pout)
-    am_am = np.ones_like(freqs)
-    am_pm = np.ones_like(freqs)
+    # acpr = acpr_calculator.calc_acpr(pout)
+    v_in_t, am_am = calculate_am_xm(pin, pout, meas_type="amp")
+    _, am_pm = calculate_am_xm(pin, pout, meas_type="phase")
     # compute PAE, Pdc, Pout, Pin, Gain, IMD3/ACPR, AM_AM, AM_PM
-    return {
-        "PAE_p": pae,
+
+
+    data = {
         "Pout_db": pout_db,
         "Pin_db": pin_db,
-        "Pdc_w": pdc,
         "Gain_db": gain_db,
-        "ACPR_dbc": acpr,
+        # "ACPR_dbc": acpr,
         "am-am": am_am,
-        "am-pm": am_pm
+        "am-pm": am_pm,
+        "pin_spectrum_db": pin_spectrum_db,
+        "pout_spectrum_db": pout_spectrum_db,
+        "pa_td_waveform": rf_td_wavefrom,
+        "dsm_td_waveform": dsm_td_waveform,
+        "am_am": am_am,
+        "am_pm": am_pm
     }
+    return data
 
-#todo fix these dims
 output_dims = {
-        "PAE_p": [("freqs", freqs)],
-        "Pout_db": [("freqs", freqs)],
-        "Pin_db": [("freqs", freqs)],
-        "Pdc_w": [("freqs", freqs)],
-        "Gain_db": [("freqs", freqs)],
-        "ACPR_dbc": [("freqs", freqs)],
-        "am-am": [("freqs", freqs)],
-        "am-pm": [("freqs", freqs)]
+        "Pout_db": [],
+        "Pin_db": [],
+        "Gain_db": [],
+        # "ACPR_dbc": [("freqs", freqs)], # todo should this be a list?
+        "pin_spectrum_db": [("frequency", freqs)],
+        "pout_spectrum_db": [("frequency", freqs)],
+        "pa_td_waveform": [("time", t_scope)],
+        "dsm_td_waveform": [("time", t_scope)],
+        "am_am": [("pin_t", pin_t)],
+        "am_pm": [("pin_t", pin_t)]
     }
 
 ds = sweep_to_xarray_from_func(sweep, measure, output_dims=output_dims)
 print(ds)
+
+print(f"pout_db: {ds.Pout_db.values}")
+print(f"pin_db: {ds.Pin_db.values}")
+print(f"gain_db: {ds.Gain_db.values}")
+
+plt.ioff()
+fig, ax = plt.subplots()
+ax.scatter(ds.pin_t.values, ds.am_am.values[-1], label="am-am")
+plt.legend()
+plt.show()
+
+fig, ax = plt.subplots()
+ax.scatter(ds.pin_t.values, ds.am_pm.values[-1], label="am-pm")
+plt.legend()
+plt.show()
+
+fig, ax = plt.subplots()
+ax.plot(ds.frequency.values, ds.pin_spectrum_db.values[-1], label="pin")
+ax.plot(ds.frequency.values, ds.pout_spectrum_db.values[-1], label="pout")
+plt.legend()
+plt.show()
+
+fig, ax = plt.subplots()
+ax.plot(ds.time.values, ds.pa_td_waveform.values[-1], label="pa")
+ax.plot(ds.time.values, ds.dsm_td_waveform.values[-1], label="dsm")
+plt.legend()
+plt.show()
+
+print("DONE")

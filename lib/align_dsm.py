@@ -2,7 +2,7 @@ import numpy as np
 import scipy
 import scipy.fft as fft
 import matplotlib.pyplot as plt
-from lib.RKL_TOOLS import find_nearest_idx
+from lib.RKL_TOOLS import find_nearest_idx, normalize
 
 
 def filter_and_decimate(t, v):
@@ -53,7 +53,7 @@ class DsmAligner:
 
             # get envelope of rf waveform
             pa_env_wvfm = np.abs(scipy.signal.hilbert(np.abs(pa_wvfm)))
-            pa_env_wvfm = pa_env_wvfm / np.max(pa_env_wvfm)
+            pa_env_wvfm = normalize(pa_env_wvfm, norm_type="min-max")
 
             # #############################
             # # for testing only
@@ -63,8 +63,7 @@ class DsmAligner:
             # #############################
             t, pa_env_wvfm = filter_and_decimate(t, pa_env_wvfm)
             t, dsm_wvfm = filter_and_decimate(t, dsm_wvfm)
-            dsm_wvfm = dsm_wvfm / np.max(dsm_wvfm)
-            dsm_wvfm -= np.min(dsm_wvfm)
+            dsm_wvfm = normalize(dsm_wvfm, norm_type="min-max")
 
 
             # cross correlate the wave forms and find the delay

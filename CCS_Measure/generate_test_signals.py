@@ -21,7 +21,6 @@ root_grid  = {"center_frequency": 4.5e9,
               "grid_step": 1e6, 
               "points": 991}
 
-
 # Signal settings
 output_directory    = os.path.join(os.getcwd(), "CCS_Measure\signals")
 name                = "Signal_10MHz_4.25GHz"
@@ -64,4 +63,3 @@ for par in target_par:
         plt.ylabel("Amplitude")
         plt.tight_layout()
         plt.show()
-    

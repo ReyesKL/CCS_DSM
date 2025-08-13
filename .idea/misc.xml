@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="vst_neo" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="vst_neo" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="VST" project-jdk-type="Python SDK" />
 </project>

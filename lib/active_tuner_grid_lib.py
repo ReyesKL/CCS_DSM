@@ -795,7 +795,7 @@ class Grid(_Grid):
 
     def find_address(self, target:_Grid, 
                      search_subgrids:bool=True, 
-                     search_supergrids:bool=True)->list[int]:
+                     search_supergrids:bool=True)->list:
         """
         Find the relational address of the target (which may be a grid or grid name) relative to the present grid
         Without any optional arguments this method will search the entire grid tree for the reference by the parent. 
@@ -814,11 +814,11 @@ class Grid(_Grid):
             
         return pres_address
 
-    def __find_address(self, target, pres_address:list[int],
+    def __find_address(self, target, pres_address:list,
                        search_subgrids:bool=True, 
                        search_supergrids:bool=True, 
                        ignore_child:Union[_Grid, None]=None, 
-                       )->list[int]:
+                       )->list:
         
         if self is target:
             return pres_address

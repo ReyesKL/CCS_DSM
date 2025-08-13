@@ -33,8 +33,8 @@ def save_sparams(sparams, freqs, fname):
     s_params.write_touchstone(f)
 
 
-# ccsURL = "tcp://127.0.0.1:7531/CCS.rem"
-ccsURL = "tcp://128.138.189.140:7531/CCS.rem"
+ccsURL = "tcp://127.0.0.1:7531/CCS.rem"
+# ccsURL = "tcp://128.138.189.140:7531/CCS.rem"
 
 # transistor bias levels and current limits
 # make sure these are right if you care about your DUT

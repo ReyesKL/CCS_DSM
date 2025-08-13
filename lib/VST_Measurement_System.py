@@ -511,7 +511,8 @@ class MeasurementSystem:
 
             largest_ranges = np.minimum(curr_ranges, prev_ranges)
             for i_prt, port in enumerate(self.ports):
-                self.rfAnalyzer.SetRangeAtPort(*port, largest_ranges[i_prt] - 1, self.ranges_range[0])
+                new_range_idx = np.max([largest_ranges[i_prt]-1, 0])
+                self.rfAnalyzer.SetRangeAtPort(*port, new_range_idx, self.ranges_range[0])
 
             # self.rfAnalyzer.Measure()
             self.measure(n_avg=num_avg)

@@ -20,8 +20,8 @@ class RTP:
         v_scale_max = 10
         # num_steps = int(v_scale_max / v_scale_min)
         self.ranges = np.arange(v_scale_min,v_scale_max+v_scale_min,v_scale_min)
-        self.scope_view = ScopeViewer.ScopeViewer()
-        self._update_viewer_time()
+        # self.scope_view = ScopeViewer.ScopeViewer()
+        # self._update_viewer_time()
         self.fixtures = [None, None, None, None]
         self.port_on_dut = [1, 1, 1, 1]
 
@@ -43,9 +43,9 @@ class RTP:
         t1 = float(header[1])
         ns = int(header[2])
         t = np.linspace(0, t1-t0, ns)
-        if update_view:
+        # if update_view:
             # self.scope_view.set_time_base(t)
-            self.scope_view.update_trace(channel, dat)
+            # self.scope_view.update_trace(channel, dat)
 
         return t, dat
     
@@ -115,7 +115,7 @@ class RTP:
             task = progress.add_task(f"Auto-scaling channel {chn}", total=None)
             while not np.isclose(old_scale,new_scale, rtol=1e-1,atol=1e-3):
                 t , v = self.get_td_data(chn)
-                # v_mn = np.mean(v)
+                v_mn = np.mean(v)
                 v_pk = np.max(v)
                 v_min = np.min(v)
                 v_rang = v_pk - v_min
@@ -124,7 +124,7 @@ class RTP:
                 old_scale = new_scale
                 # new_scale = 5 * (v_rang/10)
                 new_scale = v_rang / 2
-                # self.set_offset(v_mn, chn)
+                self.set_offset(v_mn, chn)
                 self.set_chn_scale(chn,new_scale)
                 time.sleep(0.1)
             progress.remove_task(task)
@@ -137,12 +137,12 @@ class RTP:
 
     def set_acq_time(self, acq_time):
         self.rtp.write(f"TIM:RANG {acq_time}")
-        self._update_viewer_time()
+        # self._update_viewer_time()
 
     def set_sample_rate(self, sample_rate):
         self.log.info(f"{self.name}: Setting sample rate to {sample_rate/1e9} GHz")
         self.rtp.write(f"ACQ:SRAT {sample_rate}")
-        self._update_viewer_time()
+        # self._update_viewer_time()
 
     def _update_viewer_time(self):
         t, _ = self.get_td_data(1, update_view=False)

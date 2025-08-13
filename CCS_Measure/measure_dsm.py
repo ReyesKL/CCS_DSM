@@ -1,6 +1,4 @@
 from matplotlib import pyplot as plt
-from statsmodels.tsa.vector_ar.plotting import plot_with_error
-
 from lib.VST_Measurement_System import MeasurementSystem
 from lib.logger_setup import setup_logging
 from lib.external_instrs.RTP import RTP
@@ -44,8 +42,12 @@ GATE_STEP = 1e-2
 Z0 = 50
 
 DSM = False # true if we are running the DSM, false if PA is statically biased
-voltage_lvl = 26
+voltage_lvl = 18
 
+# create the sweep variables
+# pwr_levels = SweepVar.from_linspace("pwr_level", 1, 31, 16)
+pwr_levels = SweepVar.from_list("pwr_level", list(np.arange(1,33,step=2)))
+# signals_i = SweepVar.from_list("signals", [0,1,2,3])
 
 #this is the signal power that we want to measure.
 signal_power = 0
@@ -91,10 +93,11 @@ load_tuner.gamma_0   = load_tuner.grid.full_like(0, dtype="complex")
 
 
 #load signal onto source 1
-# awg = AWG("one_word", VstSys.measurement_grid, center_frequency=4.25e9, signal_bandwidth=2e6)
-# sig, par_found = awg.get_signal_with_par(3)
-sig = MultitoneSignal.single_tone(4.25e9, VstSys.measurement_grid, power=dbm2w(signal_power), side_tones_amp=-30)
-# log.info(f"Loading signal with PAR of {par_found:.2f}dB")
+awg = AWG("one_word", VstSys.measurement_grid, center_frequency=4.25e9, signal_bandwidth=2e6)
+sig, par_found = awg.get_signal_with_par(3)
+log.info(f"Loading signal with PAR of {par_found:.2f}dB")
+# sig = MultitoneSignal.single_tone(4.25e9, VstSys.measurement_grid, power=dbm2w(signal_power), side_tones_amp=-30)
+
 
 #perform tuner setup with the generated signal
 VstSys.setup_tuners(dbm2w(signal_power), with_signal=sig)
@@ -135,8 +138,8 @@ scope.set_sample_rate(oversample_rate*(f0))
 
 
 # initialize the current meters
-bias_current_meter = E34401A(rm, "GPIB0::29::INSTR", log, "meter1")
-main_current_meter = E34401A(rm, "GPIB0::19::INSTR", log, "meter1")
+bias_current_meter = E34401A(rm, "GPIB1::29::INSTR", log, "meter1")
+main_current_meter = E34401A(rm, "GPIB1::19::INSTR", log, "meter1")
 bias_current_meter.auto_range()
 main_current_meter.auto_range()
 
@@ -149,17 +152,14 @@ aligner = DsmAligner(scope=scope,
                      pa_chn=rf_chan,
                      dsm_chn=dsm_chan)
 
-#todo initialize dc supplies for DSM
+# turn on the rf source
+source_tuner.Source.on()
 
 # create aligner and align the DSM and the RFPA
 if DSM:
-    #turn on the rf source
-    source_tuner.Source.on()
     aligner.align(debug=True, atol=1e-9, n_its=20)
 
-# create the sweep variables
-pwr_levels = SweepVar.from_linspace("pwr_level", -10, 0, 2)
-# signals_i = SweepVar.from_list("signals", [0,1,2,3])
+
 
 #create the sweep object
 sweep = Sweep([pwr_levels], inner_to_outer=True)
@@ -185,8 +185,9 @@ def measure(pwr_level):
     #todo set power level
     sig.power = dbm2w(pwr_level)
     source_tuner.move_to()
-
+    scope.auto_scale(rf_chan)
     t_scope, rf_td_wavefrom  = scope.get_td_data(rf_chan)
+    scope.auto_scale(dsm_chan)
     _, dsm_td_waveform = scope.get_td_data(dsm_chan)
     i_bias = bias_current_meter.meas_dc_current()
     i_main = main_current_meter.meas_dc_current()
@@ -209,9 +210,12 @@ def measure(pwr_level):
     gain_db = pout_db - pin_db
 
     # acpr = acpr_calculator.calc_acpr(pout)
+    acpr_low, acpr_high, _ = acpr_calculator.calc_acpr(pout)
 
-    pin_t, pout_t, t = calc_td_powers(a1, b1, a2, b2, freqs)
+    pin_t, pout_t, t = calc_td_powers(a1, np.zeros_like(a1), np.zeros_like(b2), b2, freqs)
     gain_cplx = pout_t / pin_t
+
+    pin_t_db = 10*np.log10(np.abs(pin_t)) + 30
 
 
     am_am = 10*np.log10(np.abs(gain_cplx))
@@ -227,9 +231,11 @@ def measure(pwr_level):
         "Gain_db": gain_db,
         "i_bias": i_bias,
         "i_main": i_main,
-        # "ACPR_dbc": acpr,
-        "gain_cplx": gain_cplx,
-        "pin_t": pin_t,
+        "ACPR_high_dbc": acpr_high,
+        "ACPR_low_dbc": acpr_low,
+        "gain_mag_t": am_am,
+        "gain_ang_t": am_pm,
+        "pin_t_db": pin_t_db,
         "pin_spectrum_db": pin_spectrum_db,
         "pout_spectrum_db": pout_spectrum_db,
         "pa_td_waveform": rf_td_wavefrom,
@@ -243,9 +249,11 @@ output_dims = {
         "Gain_db": [],
         "i_bias": [],
         "i_main": [],
-        # "ACPR_dbc": [("freqs", freqs)], # todo should this be a list?
-        "gain_cplx": [("vst_time", t_vst)],
-        "pin_t": [("vst_time", t_vst)],
+        "ACPR_high_dbc": [],
+        "ACPR_low_dbc": [],
+        "gain_mag_t": [("vst_time", t_vst)],
+        "gain_ang_t": [("vst_time", t_vst)],
+        "pin_t_db": [("vst_time", t_vst)],
         "pin_spectrum_db": [("frequency", freqs)],
         "pout_spectrum_db": [("frequency", freqs)],
         "pa_td_waveform": [("time", t_scope)],
@@ -253,25 +261,33 @@ output_dims = {
 
     }
 
+
+
 ds = sweep_to_xarray_from_func(sweep, measure, output_dims=output_dims)
+
+source_tuner.Source.off()
 print(ds)
 ds.attrs["signal"] = "CW"
 ds.attrs["voltage_level"] = voltage_lvl
 ds.attrs["dynamic_supply"] = DSM
-ds.to_netcdf("test.h5", engine="h5netcdf", invalid_netcdf=True)
+ds.to_netcdf(f"two_tone_static_{voltage_lvl}v.h5", engine="h5netcdf", invalid_netcdf=True)
 print(f"pout_db: {ds.Pout_db.values}")
 print(f"pin_db: {ds.Pin_db.values}")
 print(f"gain_db: {ds.Gain_db.values}")
 
 plt.ioff()
 fig, ax = plt.subplots()
-ax.scatter(ds.pin_t.values, ds.am_am.values[-1], label="am-am")
+ax.scatter(ds.pin_t_db.values[-1], ds.gain_mag_t.values[-1], label="am-am")
 plt.legend()
+plt.ylim((0,20))
+plt.xlim(-100,100)
 plt.show()
 
 fig, ax = plt.subplots()
-ax.scatter(ds.pin_t.values, ds.am_pm.values[-1], label="am-pm")
+ax.scatter(ds.pin_t_db.values[-1], ds.gain_ang_t.values[-1], label="am-pm")
 plt.legend()
+plt.ylim((-180,180))
+plt.xlim(-100,100)
 plt.show()
 
 fig, ax = plt.subplots()
@@ -282,7 +298,7 @@ plt.show()
 
 fig, ax = plt.subplots()
 ax.plot(ds.time.values, ds.pa_td_waveform.values[-1], label="pa")
-ax.plot(ds.time.values, ds.dsm_td_waveform.values[-1], label="dsm")
+# ax.plot(ds.time.values, ds.dsm_td_waveform.values[-1], label="dsm")
 plt.legend()
 plt.show()
 

@@ -360,7 +360,8 @@ def get_td_waveform(data, freqs):
     dt = 1/(N*df)
 
     #get the baseband values of the output waveform
-    wave_out = np.fft.ifft(data,N) * N
+    # wave_out = np.fft.ifft(data,N) * N
+    wave_out = np.fft.ifft(data, norm="forward")
 
     #get the time vector
     time = np.arange(N) * dt
@@ -388,10 +389,11 @@ def calc_td_powers(a1, b1, a2, b2, freqs, z0=50.0):
     """
 
     #get the time-domain waveforms
-    t, a1t = get_td_waveform(a1, freqs)
-    _, b1t = get_td_waveform(b1, freqs)
-    _, a2t = get_td_waveform(a2, freqs)
-    _, b2t = get_td_waveform(b2, freqs)
+    t, a1t = get_td_waveform(a1/np.sqrt(z0), freqs)
+    _, b1t = get_td_waveform(b1/np.sqrt(z0), freqs)
+    _, a2t = get_td_waveform(a2/np.sqrt(z0), freqs)
+    _, b2t = get_td_waveform(b2/np.sqrt(z0), freqs)
+
 
     #get the currents and voltages 
     v1 = (np.conj(z0) * a1t + z0 * b1t) / np.sqrt(np.abs(np.real(z0)))

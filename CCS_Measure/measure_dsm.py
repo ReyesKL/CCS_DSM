@@ -182,6 +182,8 @@ a2 = measuredSpectra[2, :]
 b2 = measuredSpectra[3, :]
 _, _, t_vst = calc_td_powers(a1, b1, a2, b2, freqs)
 
+# lockout the phase updates in the VST measurment system 
+VstSys.lock_phases = True
 
 # measurement function to be called for each point in the sweep
 def measure(pwr_level):

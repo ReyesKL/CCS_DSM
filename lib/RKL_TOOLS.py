@@ -59,26 +59,34 @@ def normalize(data: np.ndarray, norm_type: str = "min-max") -> np.ndarray:
 
 
 
-def calculate_am_xm(v_in_f: np.ndarray, v_out_f: np.ndarray, meas_type="amp"):
+def calculate_am_xm(a1_f: np.ndarray, b2_f: np.ndarray, meas_type="amp", Z0=50):
     meas_type = meas_type.lower()
     if meas_type not in ["amp", "phase"]:
         raise ValueError(f"Unrecognized measurement type: {meas_type}, must be 'amp' or 'phase'")
 
-    v_in_t = np.fft.ifft(v_in_f)
-    v_out_t = np.fft.ifft(v_out_f)
+    a1_t = np.fft.ifft(a1_f)
+    b2_t = np.fft.ifft(b2_f)
 
-    corr = signal.correlate(v_in_t, v_out_t)
-    lags = signal.correlation_lags(len(v_in_t), len(v_out_t))
+    corr = signal.correlate(a1_t, b2_t)
+    lags = signal.correlation_lags(len(a1_t), len(b2_t))
     lag = lags[np.argmax(np.abs(corr))]
 
-    v_out_t = np.roll(v_out_t, -lag)
+    b2_t = np.roll(b2_t, -lag)
 
-    pin_t = np.abs(v_in_t**2)
-    pout_t = np.abs(v_out_t**2)
-    gain_t = pout_t / pin_t
-    am_am = 10*np.log10(np.abs(gain_t))
-    am_pm = np.angle(gain_t, deg=True)
+    # get the currents and voltages
+    v1 = (np.conj(Z0) * a1_t) / np.sqrt(np.abs(np.real(Z0)))
+    i1 = (a1_t) / np.sqrt(np.abs(np.real(Z0)))
+
+    v2 = (Z0 * b2_t) / np.sqrt(np.abs(np.real(Z0)))
+    i2 = (b2_t) / np.sqrt(np.abs(np.real(Z0)))
+
+    # get pin and pout (assuming the system is matched)
+    pin = (v1 * np.conj(i1)) / 2
+    pout = (v2 * np.conj(i2)) / 2
+
+    gain = pout/pin
+
     if meas_type == "amp":
-        return pin_t, am_am
+        return pin, np.abs(gain)
     else:
-        return pin_t, am_pm
+        return pin, np.angle(gain, deg=True)

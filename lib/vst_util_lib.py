@@ -13,6 +13,7 @@ sys.coinit_flags = 2
 
 import tkinter as tk
 from tkinter import filedialog, messagebox
+import scipy.signal as signal
 
 #VST libraries that this module depends on 
 from lib.active_tuner_grid_lib import Grid
@@ -402,6 +403,12 @@ def calc_td_powers(a1, b1, a2, b2, freqs, z0=50.0):
     #get pin and pout (assuming the system is matched)
     pin = (v1 * np.conj(i1)) / 2
     pout = (v2 * np.conj(i2)) / 2
+
+    corr = signal.correlate(pin, pout)
+    lags = signal.correlation_lags(len(pin), len(pout))
+    lag = lags[np.argmax(np.abs(corr))]
+
+    pout = np.roll(pout, -lag)
     
     #return the input power and gain 
     return pin, pout, t

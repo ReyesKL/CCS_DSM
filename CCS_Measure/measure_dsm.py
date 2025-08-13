@@ -11,7 +11,7 @@ import pyvisa
 import numpy as np
 import skrf as rf
 from lib.waveform_generator import Multitone_Waveform_Generator as AWG
-from lib.vst_util_lib import acpr_manager, dbm2w
+from lib.vst_util_lib import acpr_manager, dbm2w, calc_td_powers
 from lib.RKL_TOOLS import find_nearest_idx, normalize, calculate_am_xm
 from lib.multitone_signal_lib import MultitoneSignal
 import xarray as xr
@@ -176,9 +176,7 @@ a1 = measuredSpectra[0, :]
 b1 = measuredSpectra[1, :]
 a2 = measuredSpectra[2, :]
 b2 = measuredSpectra[3, :]
-pout = (np.abs(b2**2)) / (2*Z0)
-pin = (np.abs(a1**2)) / (2*Z0)
-pin_t, _ = calculate_am_xm(pin, pout, meas_type="amp")
+_, _, t_vst = calc_td_powers(a1, b1, a2, b2, freqs)
 
 
 # measurement function to be called for each point in the sweep
@@ -211,8 +209,15 @@ def measure(pwr_level):
     gain_db = pout_db - pin_db
 
     # acpr = acpr_calculator.calc_acpr(pout)
-    v_in_t, am_am = calculate_am_xm(pin, pout, meas_type="amp")
-    _, am_pm = calculate_am_xm(pin, pout, meas_type="phase")
+
+    pin_t, pout_t, t = calc_td_powers(a1, b1, a2, b2, freqs)
+    gain_cplx = pout_t / pin_t
+
+
+    am_am = 10*np.log10(np.abs(gain_cplx))
+    am_pm = np.angle(gain_cplx, deg=True)
+
+
     # compute PAE, Pdc, Pout, Pin, Gain, IMD3/ACPR, AM_AM, AM_PM
 
 
@@ -223,8 +228,8 @@ def measure(pwr_level):
         "i_bias": i_bias,
         "i_main": i_main,
         # "ACPR_dbc": acpr,
-        "am_am": am_am,
-        "am_pm": am_pm,
+        "gain_cplx": gain_cplx,
+        "pin_t": pin_t,
         "pin_spectrum_db": pin_spectrum_db,
         "pout_spectrum_db": pout_spectrum_db,
         "pa_td_waveform": rf_td_wavefrom,
@@ -239,12 +244,13 @@ output_dims = {
         "i_bias": [],
         "i_main": [],
         # "ACPR_dbc": [("freqs", freqs)], # todo should this be a list?
+        "gain_cplx": [("vst_time", t_vst)],
+        "pin_t": [("vst_time", t_vst)],
         "pin_spectrum_db": [("frequency", freqs)],
         "pout_spectrum_db": [("frequency", freqs)],
         "pa_td_waveform": [("time", t_scope)],
         "dsm_td_waveform": [("time", t_scope)],
-        "am_am": [("pin_t", pin_t)],
-        "am_pm": [("pin_t", pin_t)]
+
     }
 
 ds = sweep_to_xarray_from_func(sweep, measure, output_dims=output_dims)

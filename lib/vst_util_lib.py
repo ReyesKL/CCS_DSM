@@ -558,3 +558,4 @@ class imd3_manager:
         self.__ref_sig = new_val
 
         #run the calculate imd's operation
+        self.update_tone_locations()

@@ -162,6 +162,9 @@ class MeasurementSystem:
         #first, build the measurement grid as the base grid for the tuners
         self.measurement_grid = self.__generate_base_grid()
 
+        #Special options
+        self.lock_phases = True
+
     def init_aligner(self):
         rel_ph = np.array(list(map(float, self.source1.RelativeMultiTones.RelativePhases)))
         rel_amp = np.array(list(map(float, self.source1.RelativeMultiTones.RelativeAmplitudes)))
@@ -765,9 +768,11 @@ class MeasurementSystem:
         delta_phase = 1 * np.angle(delta, deg=True)
 
         # rel_phases += damping_fac * delta_phase
-        rel_phases += delta_phase
-        rel_phases = np.where(rel_phases > 360, rel_phases - 360, rel_phases)
-        rel_phases = np.where(rel_phases < 0, rel_phases + 360, rel_phases)
+
+        if not self.lock_phases: 
+            rel_phases += delta_phase
+            rel_phases = np.where(rel_phases > 360, rel_phases - 360, rel_phases)
+            rel_phases = np.where(rel_phases < 0, rel_phases + 360, rel_phases)
 
         #update the source
         # source.OutputLevel += damping_fac * delta_amp

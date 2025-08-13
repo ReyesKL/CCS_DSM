@@ -388,23 +388,43 @@ def calc_td_powers(a1, b1, a2, b2, freqs, z0=50.0):
         The AM-AM conversion.
     """
 
+    #convert from voltage to power waves
+    a1 = a1 / np.sqrt(np.abs(np.real(z0)))
+    b1 = b1 / np.sqrt(np.abs(np.real(z0)))
+    a2 = a2 / np.sqrt(np.abs(np.real(z0)))
+    b2 = b2 / np.sqrt(np.abs(np.real(z0)))
+
+    #get the currents and voltages
+    v1 = (np.conj(z0) * a1 + z0 * b1) / np.sqrt(np.abs(np.real(z0)))
+    i1 = (a1 - b1) / np.sqrt(np.abs(np.real(z0)))
+    v2 = (np.conj(z0) * a2 + z0 * b2) / np.sqrt(np.abs(np.real(z0)))
+    i2 = (a2 - b2) / np.sqrt(np.abs(np.real(z0)))
+
     #get the time-domain waveforms
-    t, a1t = get_td_waveform(a1/np.sqrt(z0), freqs)
-    _, b1t = get_td_waveform(b1/np.sqrt(z0), freqs)
-    _, a2t = get_td_waveform(a2/np.sqrt(z0), freqs)
-    _, b2t = get_td_waveform(b2/np.sqrt(z0), freqs)
+    t, v1 = get_td_waveform(v1, freqs)
+    _, i1 = get_td_waveform(i1, freqs)
+    _, v2 = get_td_waveform(v2, freqs)
+    _, i2 = get_td_waveform(i2, freqs)
 
+    # #get the time-domain waveforms
+    # t, a1t = get_td_waveform(a1/np.sqrt(z0), freqs)
+    # _, b1t = get_td_waveform(b1/np.sqrt(z0), freqs)
+    # _, a2t = get_td_waveform(a2/np.sqrt(z0), freqs)
+    # _, b2t = get_td_waveform(b2/np.sqrt(z0), freqs)
 
-    #get the currents and voltages 
-    v1 = (np.conj(z0) * a1t + z0 * b1t) / np.sqrt(np.abs(np.real(z0)))
-    i1 = (a1t - b1t) / np.sqrt(np.abs(np.real(z0)))
-
-    v2 = (np.conj(z0) * a2t + z0 * b2t) / np.sqrt(np.abs(np.real(z0)))
-    i2 = (a2t - b2t) / np.sqrt(np.abs(np.real(z0)))
+    # #get the currents and voltages
+    # v1 = (np.conj(z0) * a1t + z0 * b1t) / np.sqrt(np.abs(np.real(z0)))
+    # i1 = (a1t - b1t) / np.sqrt(np.abs(np.real(z0)))
+    #
+    # v2 = (np.conj(z0) * a2t + z0 * b2t) / np.sqrt(np.abs(np.real(z0)))
+    # i2 = (a2t - b2t) / np.sqrt(np.abs(np.real(z0)))
 
     #get pin and pout (assuming the system is matched)
-    pin = (v1 * np.conj(i1)) / 2
-    pout = (v2 * np.conj(i2)) / 2
+    # pin = (v1 * np.conj(i1)) / 2
+    # pout = (v2 * np.conj(i2)) / 2
+
+    pin = (v1**2 ) / (2*50)
+    pout = (v2**2 ) / (2*50)
 
     corr = signal.correlate(pin, pout)
     lags = signal.correlation_lags(len(pin), len(pout))
@@ -519,7 +539,6 @@ class imd3_manager:
         self.reference_signal = reference_signal 
     
     def update_tone_locations(self):
-        Grid.index()
         #get the signal indices on the root grid
         rt = self.__root_grid
 
@@ -527,10 +546,15 @@ class imd3_manager:
         sig_idx = rt.cast_index(self.__ref_sig.grid, about_center=True)
 
         #determine the imd indices 
-        imd_idx = np.ndarray([sig_idx[0]*2 - sig_idx[1], sig_idx[1]*2 - sig_idx[0]], dtype="int")
+        imd_idx = np.array([sig_idx[0]*2 - sig_idx[1], sig_idx[1]*2 - sig_idx[0]], dtype="int")
 
         #get the tone indices 
         self.__tone_indices = np.sort(np.concatenate((sig_idx, imd_idx)))
+
+        #return the boolean mask of the tones on the root grid (fix later)
+        rt_indices = rt.index(about_center=True)
+        self.__tone_indices = np.isin(rt_indices, self.__tone_indices)
+
     
     def calculate(self, meas_power:np.ndarray[float])->tuple[float, float]:
         #get the powers at the indices provided
@@ -538,7 +562,7 @@ class imd3_manager:
 
         #calculate the lower and upper imd
         imd_lower = meas_power[0] / meas_power[1]
-        imd_upper =meas_power[3] / meas_power[2]
+        imd_upper = meas_power[3] / meas_power[2]
 
         #return the measured values
         return db(imd_lower), db(imd_upper), None

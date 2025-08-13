@@ -41,21 +41,22 @@ DRAIN_OSC_THRESHOLD = 100e-3
 GATE_STEP = 1e-2
 Z0 = 50
 
-DSM = False # true if we are running the DSM, false if PA is statically biased
-voltage_lvl = 18
+DSM = True # true if we are running the DSM, false if PA is statically biased
+voltage_lvl = 26
 IS_TWO_TONE = True
+descr_str = "dyn_26v_to_23v"
 
 # create the sweep variables
 # pwr_levels = SweepVar.from_linspace("pwr_level", 1, 31, 16)
-pwr_levels = SweepVar.from_list("pwr_level", list(np.arange(1,33,step=2)))
+pwr_levels = SweepVar.from_list("pwr_level", list(np.arange(1,35,step=2)))
 # signals_i = SweepVar.from_list("signals", [0,1,2,3])
 
 #this is the signal power that we want to measure.
 signal_power = 0
 
 #hardcoded for now, used to set up oscilloscope
-f0 = 4.5e9
-signal_bw = 5e6
+f0 = 4.25e9
+signal_bw = 1e6
 oversample_rate = 4
 signal_period = 1/signal_bw
 num_periods = 4
@@ -112,9 +113,9 @@ load_tuner.S0  = sig
 # source_tuner.Source.on()
 # VstSys.load_signal(sig, 1)
 if IS_TWO_TONE:
-    linearity_calculator = acpr_manager(sig, VstSys.measurement_grid, guard_bandwidth=100e3)
-else:
     linearity_calculator = imd3_manager(sig, VstSys.measurement_grid)
+else:
+    linearity_calculator = acpr_manager(sig, VstSys.measurement_grid, guard_bandwidth=100e3)
 
  
 #load the signal into source 2
@@ -160,11 +161,9 @@ aligner = DsmAligner(scope=scope,
 # turn on the rf source
 source_tuner.Source.on()
 
-# create aligner and align the DSM and the RFPA
-if DSM:
-    aligner.align(debug=True, atol=1e-9, n_its=20)
-
-
+# # create aligner and align the DSM and the RFPA
+# if DSM:
+#     aligner.align(debug=True, atol=1e-10, n_its=20)
 
 #create the sweep object
 sweep = Sweep([pwr_levels], inner_to_outer=True)
@@ -190,6 +189,11 @@ def measure(pwr_level):
     #todo set power level
     sig.power = dbm2w(pwr_level)
     source_tuner.move_to()
+
+    # create aligner and align the DSM and the RFPA
+    if DSM:
+        aligner.align(debug=False, atol=1e-9, n_its=20)
+
     scope.auto_scale(rf_chan)
     t_scope, rf_td_wavefrom  = scope.get_td_data(rf_chan)
     scope.auto_scale(dsm_chan)
@@ -217,8 +221,11 @@ def measure(pwr_level):
     # acpr = acpr_calculator.calc_acpr(pout)
     linearity_low, linearity_high, _ = linearity_calculator.calculate(pout)
 
+    # pin_t, pout_t, t = calc_td_powers(a1, np.zeros_like(a1, dtype=complex), np.zeros_like(b2, dtype=complex), b2, freqs)
     pin_t, pout_t, t = calc_td_powers(a1, np.zeros_like(a1), np.zeros_like(b2), b2, freqs)
+
     gain_cplx = pout_t / pin_t
+
 
     pin_t_db = 10*np.log10(np.abs(pin_t)) + 30
 
@@ -236,8 +243,8 @@ def measure(pwr_level):
         "Gain_db": gain_db,
         "i_bias": i_bias,
         "i_main": i_main,
-        "linearity_high_dbc": acpr_high,
-        "linearity_low_dbc": acpr_low,
+        "linearity_high_dbc": linearity_high,
+        "linearity_low_dbc": linearity_low,
         "gain_mag_t": am_am,
         "gain_ang_t": am_pm,
         "pin_t_db": pin_t_db,
@@ -279,7 +286,7 @@ else:
 ds.attrs["signal"] = "CW"
 ds.attrs["voltage_level"] = voltage_lvl
 ds.attrs["dynamic_supply"] = DSM
-ds.to_netcdf(f"two_tone_static_{voltage_lvl}v.h5", engine="h5netcdf", invalid_netcdf=True)
+ds.to_netcdf(f"two_tone_{descr_str}_{voltage_lvl}v.h5", engine="h5netcdf", invalid_netcdf=True)
 print(f"pout_db: {ds.Pout_db.values}")
 print(f"pin_db: {ds.Pin_db.values}")
 print(f"gain_db: {ds.Gain_db.values}")

@@ -166,6 +166,42 @@ class MultitoneSignal:
         return cls(num_tones, sig_grid, power=power, power_type=power_type, with_tone_vals=A0_init, Z0=Z0, auto_level=auto_level)
     
     @classmethod
+    def two_tone(cls, at_frequency:float, bandwidth:float, on_grid:Grid, grid_name:str="single_tone_signal", power:float=1e-3, phases:list[float]=[0,0], amplitudes:list[float]=[1,1], power_type:str="peak", Z0:float=50, auto_level:bool=True, deg:bool=True):
+        
+        #determine the number of offset tones from the center frequency
+        tone_offset = np.max([int(np.round((bandwidth/2) / on_grid.frequency_resolution)), 1])
+        
+        #find the desired frequency on the specified grid
+        freq_idx = np.argmin(np.abs(at_frequency - on_grid.freqs))
+
+        #create a mask of the prior grid and set the desired frequency to true
+        grid_mask = on_grid.full_like(False,dtype="bool")
+        grid_mask[freq_idx + tone_offset] = True
+        grid_mask[freq_idx - tone_offset] = True
+
+        #now create a simple signal grid
+        grid_source = None
+        grid_mod    = OrMask(grid_mask)
+        grid_gen    = GridGenerator(grid_source, grid_mod)
+        sig_grid    = Grid.generate(grid_name,using=grid_gen,on=on_grid)
+
+        #make sure the phase is in the right units
+        phases = np.array(phases,dtype="float")
+        if deg:
+            phases = np.deg2rad(phases)
+
+        amplitudes = np.array(amplitudes,dtype="complex")
+
+        #Initialize the center tone
+        A0_init = amplitudes * np.exp(1j * phases)
+
+        #set the number of tones
+        num_tones = A0_init.size
+        
+        #return the class
+        return cls(num_tones, sig_grid, power=power, power_type=power_type, with_tone_vals=A0_init, Z0=Z0, auto_level=auto_level)
+    
+    @classmethod
     def from_vst_signal(cls, vst_sig, with_grid:Grid, power:float=1e-3, power_type:str="peak", 
                  Z0:float=50, using_ref_grid:Union[Grid,None]=None,
                  auto_level:bool=True, phase_in_deg:bool=True,

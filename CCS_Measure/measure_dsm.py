@@ -9,7 +9,7 @@ import pyvisa
 import numpy as np
 import skrf as rf
 from lib.waveform_generator import Multitone_Waveform_Generator as AWG
-from lib.vst_util_lib import acpr_manager, dbm2w, calc_td_powers
+from lib.vst_util_lib import acpr_manager, imd3_manager, dbm2w, calc_td_powers
 from lib.RKL_TOOLS import find_nearest_idx, normalize, calculate_am_xm
 from lib.multitone_signal_lib import MultitoneSignal
 import xarray as xr
@@ -43,6 +43,7 @@ Z0 = 50
 
 DSM = False # true if we are running the DSM, false if PA is statically biased
 voltage_lvl = 18
+IS_TWO_TONE = True
 
 # create the sweep variables
 # pwr_levels = SweepVar.from_linspace("pwr_level", 1, 31, 16)
@@ -110,7 +111,11 @@ load_tuner.S0  = sig
 
 # source_tuner.Source.on()
 # VstSys.load_signal(sig, 1)
-acpr_calculator = acpr_manager(sig, VstSys.measurement_grid, guard_bandwidth=100e3)
+if IS_TWO_TONE:
+    linearity_calculator = acpr_manager(sig, VstSys.measurement_grid, guard_bandwidth=100e3)
+else:
+    linearity_calculator = imd3_manager(sig, VstSys.measurement_grid)
+
  
 #load the signal into source 2
 source = VstSys.source1
@@ -210,7 +215,7 @@ def measure(pwr_level):
     gain_db = pout_db - pin_db
 
     # acpr = acpr_calculator.calc_acpr(pout)
-    acpr_low, acpr_high, _ = acpr_calculator.calc_acpr(pout)
+    linearity_low, linearity_high, _ = linearity_calculator.calculate(pout)
 
     pin_t, pout_t, t = calc_td_powers(a1, np.zeros_like(a1), np.zeros_like(b2), b2, freqs)
     gain_cplx = pout_t / pin_t
@@ -231,8 +236,8 @@ def measure(pwr_level):
         "Gain_db": gain_db,
         "i_bias": i_bias,
         "i_main": i_main,
-        "ACPR_high_dbc": acpr_high,
-        "ACPR_low_dbc": acpr_low,
+        "linearity_high_dbc": acpr_high,
+        "linearity_low_dbc": acpr_low,
         "gain_mag_t": am_am,
         "gain_ang_t": am_pm,
         "pin_t_db": pin_t_db,
@@ -249,8 +254,8 @@ output_dims = {
         "Gain_db": [],
         "i_bias": [],
         "i_main": [],
-        "ACPR_high_dbc": [],
-        "ACPR_low_dbc": [],
+        "linearity_high_dbc": [],
+        "linearity_low_dbc": [],
         "gain_mag_t": [("vst_time", t_vst)],
         "gain_ang_t": [("vst_time", t_vst)],
         "pin_t_db": [("vst_time", t_vst)],
@@ -267,6 +272,10 @@ ds = sweep_to_xarray_from_func(sweep, measure, output_dims=output_dims)
 
 source_tuner.Source.off()
 print(ds)
+if IS_TWO_TONE:
+    ds.attrs["linearity_metric"] = "IMD3"
+else:
+    ds.attrs["linearity_metric"] = "ACPR"
 ds.attrs["signal"] = "CW"
 ds.attrs["voltage_level"] = voltage_lvl
 ds.attrs["dynamic_supply"] = DSM

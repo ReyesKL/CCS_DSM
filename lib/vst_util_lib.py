@@ -468,7 +468,7 @@ class acpr_manager:
         self.__lower_channel_mask = np.logical_and(f1a <= meas_freqs, meas_freqs < f1b)
         self.__upper_channel_mask = np.logical_and(f2a <  meas_freqs, meas_freqs < f2b)
 
-    def calc_acpr(self, meas_power:np.ndarray[float]):
+    def calculate(self, meas_power:np.ndarray[float]):
         #Calculate the ACPR from measured spectral power and returns in dB
 
         #get the data from each of the three channels
@@ -500,3 +500,61 @@ class acpr_manager:
         self.__ref_sig = new_val
         #rebuild all channel masks
         self.__build_channel_masks()
+
+class imd3_manager:
+    def __init__(self, reference_signal:MultitoneSignal, measurement_grid:Grid):
+        
+        #create the private properties for this class
+        self.__ref_sig      = None
+        self.__root_grid    = None
+        self.__tone_indices = None
+
+        #Set the measurement grid
+        if isinstance(measurement_grid, Grid):
+            self.__root_grid = measurement_grid
+        else:
+            raise TypeError("Measurement grid must be of type Grid")
+
+        #set the reference signal
+        self.reference_signal = reference_signal 
+    
+    def update_tone_locations(self):
+        Grid.index()
+        #get the signal indices on the root grid
+        rt = self.__root_grid
+
+        #get the signal tones on the root grid
+        sig_idx = rt.cast_index(self.__ref_sig.grid, about_center=True)
+
+        #determine the imd indices 
+        imd_idx = np.ndarray([sig_idx[0]*2 - sig_idx[1], sig_idx[1]*2 - sig_idx[0]], dtype="int")
+
+        #get the tone indices 
+        self.__tone_indices = np.sort(np.concatenate((sig_idx, imd_idx)))
+    
+    def calculate(self, meas_power:np.ndarray[float])->tuple[float, float]:
+        #get the powers at the indices provided
+        meas_power = meas_power[self.__tone_indices]
+
+        #calculate the lower and upper imd
+        imd_lower = meas_power[0] / meas_power[1]
+        imd_upper =meas_power[3] / meas_power[2]
+
+        #return the measured values
+        return db(imd_lower), db(imd_upper), None
+
+    @property
+    def reference_signal(self)->MultitoneSignal:
+        return self.__ref_sig
+
+    @reference_signal.setter
+    def reference_signal(self, new_val):
+        if not isinstance(new_val, MultitoneSignal):
+            raise TypeError("Provided object is not a MultitoneSignal object.")
+        elif not new_val.num_tones == 2:
+            raise ValueError("Provided signal must be a 2-tone signal")
+        
+        #set the signal
+        self.__ref_sig = new_val
+
+        #run the calculate imd's operation

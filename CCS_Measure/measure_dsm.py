@@ -44,7 +44,7 @@ Z0 = 50
 DSM = True # true if we are running the DSM, false if PA is statically biased
 voltage_lvl = 26
 IS_TWO_TONE = True
-descr_str = "dyn_26v_to_23v"
+descr_str = "dyn_2_level"
 
 # create the sweep variables
 # pwr_levels = SweepVar.from_linspace("pwr_level", 1, 31, 16)
@@ -56,10 +56,10 @@ signal_power = 0
 
 #hardcoded for now, used to set up oscilloscope
 f0 = 4.25e9
-signal_bw = 1e6
-oversample_rate = 4
+signal_bw = 2e6
+oversample_rate = 2
 signal_period = 1/signal_bw
-num_periods = 4
+num_periods = 6
 
 rf_chan = 1
 dsm_chan = 3
@@ -161,9 +161,9 @@ aligner = DsmAligner(scope=scope,
 # turn on the rf source
 source_tuner.Source.on()
 
-# # create aligner and align the DSM and the RFPA
-# if DSM:
-#     aligner.align(debug=True, atol=1e-10, n_its=20)
+# create aligner and align the DSM and the RFPA
+if DSM:
+    aligner.align(debug=True, atol=1e-10, n_its=20)
 
 #create the sweep object
 sweep = Sweep([pwr_levels], inner_to_outer=True)
@@ -183,7 +183,7 @@ b2 = measuredSpectra[3, :]
 _, _, t_vst = calc_td_powers(a1, b1, a2, b2, freqs)
 
 # lockout the phase updates in the VST measurment system 
-VstSys.lock_phases = True
+VstSys.lockout_updates = True
 
 # measurement function to be called for each point in the sweep
 def measure(pwr_level):
@@ -192,9 +192,9 @@ def measure(pwr_level):
     sig.power = dbm2w(pwr_level)
     source_tuner.move_to()
 
-    # create aligner and align the DSM and the RFPA
-    if DSM:
-        aligner.align(debug=False, atol=1e-9, n_its=20)
+    # # create aligner and align the DSM and the RFPA
+    # if DSM:
+    #     aligner.align(debug=False, atol=1e-9, n_its=20)
 
     scope.auto_scale(rf_chan)
     t_scope, rf_td_wavefrom  = scope.get_td_data(rf_chan)

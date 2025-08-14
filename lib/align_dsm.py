@@ -13,7 +13,7 @@ def filter_and_decimate(t, v):
     v_f = fft.fftshift(fft.fft(v))
     f = fft.fftshift(fft.fftfreq(v.size, dt))
 
-    f_max_idx = find_nearest_idx(f, 100e6)
+    f_max_idx = find_nearest_idx(f, 20e6) #from 20e6
     v_f[f_max_idx:] = 0
     v = fft.ifft(fft.ifftshift(v_f))
     v = scipy.signal.decimate(v, 10)

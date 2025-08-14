@@ -163,7 +163,7 @@ class MeasurementSystem:
         self.measurement_grid = self.__generate_base_grid()
 
         #Special options
-        self.lock_phases = True
+        self.lockout_updates = False
 
     def init_aligner(self):
         rel_ph = np.array(list(map(float, self.source1.RelativeMultiTones.RelativePhases)))
@@ -769,16 +769,17 @@ class MeasurementSystem:
 
         # rel_phases += damping_fac * delta_phase
 
-        if not self.lock_phases: 
-            rel_phases += delta_phase
-            rel_phases = np.where(rel_phases > 360, rel_phases - 360, rel_phases)
-            rel_phases = np.where(rel_phases < 0, rel_phases + 360, rel_phases)
+        rel_phases += delta_phase
+        rel_phases = np.where(rel_phases > 360, rel_phases - 360, rel_phases)
+        rel_phases = np.where(rel_phases < 0, rel_phases + 360, rel_phases)
 
         #update the source
         # source.OutputLevel += damping_fac * delta_amp
         source.OutputLevel += delta_amp
         # update the signal
-        source.PlayMultitone((tone_list), rel_amps, rel_phases)
+
+        if not self.lockout_updates:
+            source.PlayMultitone((tone_list), rel_amps, rel_phases)
 
     def add_tones_from_grid(self, source, tone_locations:Union[np.ndarray[bool], np.ndarray[int]], ref_grid:atg.Grid, new_vals:np.ndarray[complex]):
         """

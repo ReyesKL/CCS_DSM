@@ -23,10 +23,10 @@ root_grid  = {"center_frequency": 4.5e9,
 
 # Signal settings
 output_directory    = os.path.join(os.getcwd(), "CCS_Measure\signals")
-name                = "Signal_10MHz_4.5GHz"
-bandwidth           = 10e6
+name                = "Signal_20MHz_4.5GHz"
+bandwidth           = 20e6
 notch_frac          = 0.1
-target_par          = [3,4,5,6,7,8]
+target_par          = [4,5,6,7,8,9,10]
 carrier_frequency   = root_grid["center_frequency"]
 plot_signal         = True
 
